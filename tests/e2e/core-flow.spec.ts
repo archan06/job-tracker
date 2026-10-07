@@ -13,7 +13,7 @@ test("register → create → board → change status → timeline", async ({ pa
   await expect(page).toHaveURL(/\/board/);
 
   await page.goto("/applications/new");
-  await page.getByLabel("Company").fill("Playwright Inc");
+  await page.getByLabel("Company", { exact: true }).fill("Playwright Inc");
   await page.getByLabel("Job title").fill("QA Engineer");
   await page.getByRole("button", { name: "Save application" }).click();
   await expect(page).toHaveURL(/\/applications\/(?!new)[^/]+$/);

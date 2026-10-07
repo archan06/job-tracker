@@ -23,3 +23,8 @@ test("signed-out visitors can't open app pages", () => {
   expect(authorized("/board", "GET", false)).toBe(false);
   expect(authorized("/login", "GET", false)).toBe(true);
 });
+
+test("signed-out visitors can load the app icons (the login page uses them)", () => {
+  expect(authorized("/apple-icon", "GET", false)).toBe(true);
+  expect(authorized("/apple-iconic-page", "GET", false)).toBe(false);
+});

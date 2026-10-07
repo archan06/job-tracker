@@ -19,7 +19,7 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
     <div className="flex min-h-[100dvh] flex-col">
       <header className="sticky top-0 z-20 border-b border-border bg-surface/90 pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-[1400px] items-center gap-6 px-4 sm:px-6">
-          <Link href="/board" aria-label="Job Tracker home" className="rounded-lg focus-visible:outline-2 focus-visible:outline-ring">
+          <Link href="/board" aria-label="Landed home" className="rounded-lg focus-visible:outline-2 focus-visible:outline-ring">
             <Brand />
           </Link>
           <TopNavLinks />

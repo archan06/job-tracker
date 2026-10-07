@@ -30,3 +30,15 @@ export async function enforceWriteLimit(userId: string, now = new Date()): Promi
 
 /** Autocomplete lookups per account per minute. Plenty for typing, too few to drain the providers' free quotas. */
 export const SUGGESTIONS_PER_MINUTE = 120;
+
+/**
+ * Lookups per day each provider may receive from the whole app, kept under the free tiers
+ * (Geoapify allows 3,000 a day). Without this, one account typing unique queries could use
+ * up the day's quota for everyone. Counted only on cache misses.
+ */
+export const PROVIDER_DAILY_BUDGET = { geoapify: 2500, logodev: 10_000 } as const;
+
+export async function spendProviderBudget(provider: keyof typeof PROVIDER_DAILY_BUDGET, now = new Date()): Promise<void> {
+  const { ok } = await rateLimit(`provider:${provider}:day`, PROVIDER_DAILY_BUDGET[provider], 24 * 60 * 60_000, now);
+  if (!ok) throw new RateLimitedError(`Daily ${provider} budget used up`);
+}

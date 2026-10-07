@@ -34,7 +34,20 @@ export function CompanyLogo({ company, domain, size, className = "" }: Props) {
       {showImage ? (
         // The CDN already resizes, so next/image's optimizer would only add a hop.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" width={px} height={px} loading="lazy" decoding="async" className="size-full object-contain" onError={() => setFailedSrc(src)} />
+        <img
+          ref={(img) => {
+            // An image that failed before hydration never fires onError for React, so check on mount.
+            if (img?.complete && img.naturalWidth === 0) setFailedSrc(src);
+          }}
+          src={src}
+          alt=""
+          width={px}
+          height={px}
+          loading="lazy"
+          decoding="async"
+          className="size-full object-contain"
+          onError={() => setFailedSrc(src)}
+        />
       ) : (
         initials(company)
       )}

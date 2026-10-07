@@ -91,3 +91,46 @@ test("a typed location without picking saves as typed", async ({ page }) => {
   await expect(page).toHaveURL(/\/applications\/(?!new)[^/]+$/);
   await expect(page.getByText("Remote (US only)")).toBeVisible();
 });
+
+test("a logo that fails to load shows initials, even if it fails before the page is interactive", async ({ page }) => {
+  await page.goto("/applications/new");
+  await companyBox(page).fill("stri");
+  await page.getByRole("option", { name: /Stripe/ }).click();
+  await page.getByLabel("Job title").fill("Engineer");
+  await page.getByRole("button", { name: "Save application" }).click();
+  await expect(page).toHaveURL(/\/applications\/(?!new)[^/]+$/);
+  await page.route("https://img.logo.dev/**", (route) => route.fulfill({ status: 404, body: "" }));
+  // Hold the page's JavaScript back so the image fails before React hydrates.
+  await page.route("**/_next/static/chunks/**", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.continue();
+  });
+  await page.reload();
+  await expect(page.locator("h1").locator("xpath=../../..").getByTestId("company-logo")).toHaveText("S");
+});
+
+test("Enter while suggestions are open but none is highlighted closes the list instead of submitting", async ({ page }) => {
+  await page.goto("/applications/new");
+  await page.getByLabel("Job title").fill("Engineer");
+  const company = companyBox(page);
+  await company.fill("stri");
+  await expect(page.getByRole("option", { name: /Stripe/ })).toBeVisible();
+  await company.press("Enter");
+  await expect(page.getByRole("option", { name: /Stripe/ })).toBeHidden();
+  await expect(page).toHaveURL(/\/applications\/new$/);
+  await expect(company).toHaveValue("stri");
+  await company.press("Enter"); // list closed: now Enter submits
+  await expect(page).toHaveURL(/\/applications\/(?!new)[^/]+$/);
+});
+
+test("typing after highlighting an option drops the highlight, so Enter keeps the typed text", async ({ page }) => {
+  await page.goto("/applications/new");
+  const company = companyBox(page);
+  await company.fill("sho");
+  await expect(page.getByRole("option", { name: /Shopify/ })).toBeVisible();
+  await company.press("ArrowDown");
+  await company.pressSequentially("p cart co");
+  await company.press("Enter");
+  await expect(company).toHaveValue("shop cart co");
+  await expect(page).toHaveURL(/\/applications\/new$/);
+});

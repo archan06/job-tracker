@@ -5,6 +5,7 @@ import type { Application } from "@/generated/prisma/browser";
 import { useFormAction } from "@/components/forms/use-form-action";
 import { useLocalToday } from "@/components/forms/use-local-today";
 import { CompanyField } from "@/components/applications/company-field";
+import { LocationField } from "@/components/applications/location-field";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Field, FormAlert, Input, Select, Textarea } from "@/components/ui/field";
 import { toDateInputValue } from "@/lib/dates";
@@ -92,9 +93,7 @@ export function ApplicationForm(props: Props) {
         </Section>
 
         <Section title="Details">
-          <Field id="location" label="Location" optional error={fieldErrors.location}>
-            <Input id="location" name="location" placeholder="Remote, New York, ..." defaultValue={text("location")} invalid={!!fieldErrors.location} />
-          </Field>
+          <LocationField initial={text("location")} errors={fieldErrors.location} />
           <Field id="salaryRange" label="Salary range" optional error={fieldErrors.salaryRange}>
             <Input id="salaryRange" name="salaryRange" placeholder="$120k-$150k" defaultValue={text("salaryRange")} invalid={!!fieldErrors.salaryRange} />
           </Field>

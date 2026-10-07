@@ -56,3 +56,38 @@ test("an auto-filled website clears when the company changes; a typed one stays"
   await company.fill("Acme");
   await expect(website).toHaveValue("acme.io");
 });
+
+test("location quick picks: Remote, and Hybrid… followed by a city", async ({ page }) => {
+  await page.goto("/applications/new");
+  const location = page.getByRole("combobox", { name: "Location" });
+  await location.focus();
+  await expect(page.getByRole("option", { name: "Remote" })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Hybrid…" })).toBeVisible();
+  await expect(page.getByText("Powered by Geoapify")).toBeVisible();
+  await page.getByRole("option", { name: "Remote" }).click();
+  await expect(location).toHaveValue("Remote");
+
+  await location.fill("");
+  await page.getByRole("option", { name: "Hybrid…" }).click();
+  await expect(location).toHaveValue("Hybrid · ");
+  await expect(location).toBeFocused();
+  await location.pressSequentially("tor");
+  await page.getByRole("option", { name: "Toronto, ON, Canada" }).click();
+  await expect(location).toHaveValue("Hybrid · Toronto, ON, Canada");
+
+  await companyBox(page).fill("Acme");
+  await page.getByLabel("Job title").fill("Engineer");
+  await page.getByRole("button", { name: "Save application" }).click();
+  await expect(page).toHaveURL(/\/applications\/(?!new)[^/]+$/);
+  await expect(page.getByText("Hybrid · Toronto, ON, Canada")).toBeVisible();
+});
+
+test("a typed location without picking saves as typed", async ({ page }) => {
+  await page.goto("/applications/new");
+  await companyBox(page).fill("Acme");
+  await page.getByLabel("Job title").fill("Engineer");
+  await page.getByRole("combobox", { name: "Location" }).fill("Remote (US only)");
+  await page.getByRole("button", { name: "Save application" }).click();
+  await expect(page).toHaveURL(/\/applications\/(?!new)[^/]+$/);
+  await expect(page.getByText("Remote (US only)")).toBeVisible();
+});

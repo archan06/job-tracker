@@ -41,3 +41,14 @@ test("writes per account are capped per minute", async () => {
   await expect(enforceWriteLimit("user-2", later(30_000))).resolves.toBeUndefined();
   await expect(enforceWriteLimit("user-1", later(60_000))).resolves.toBeUndefined();
 });
+
+import { PROVIDER_DAILY_BUDGET, spendProviderBudget } from "@/server/services/rate-limit";
+
+test("each provider has a shared daily budget across all users", async () => {
+  expect(PROVIDER_DAILY_BUDGET).toEqual({ geoapify: 2500, logodev: 10_000 });
+  const hits = Array.from({ length: PROVIDER_DAILY_BUDGET.geoapify }, () => spendProviderBudget("geoapify", now));
+  await Promise.all(hits);
+  await expect(spendProviderBudget("geoapify", later(60 * 60_000))).rejects.toBeInstanceOf(RateLimitedError);
+  await expect(spendProviderBudget("logodev", later(60 * 60_000))).resolves.toBeUndefined();
+  await expect(spendProviderBudget("geoapify", later(24 * 60 * 60_000))).resolves.toBeUndefined();
+});

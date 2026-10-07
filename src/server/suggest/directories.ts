@@ -1,22 +1,27 @@
 import { cacheLife } from "next/cache";
+import { spendProviderBudget } from "@/server/services/rate-limit";
 import { PROVIDER_TIMEOUT_MS } from "@/server/services/suggestions";
 import { fakeCompanyDirectory, fakePlaceDirectory } from "./fake";
 import { geoapifyDirectory } from "./geoapify";
 import { logoDevDirectory } from "./logo-dev";
 import type { CompanyDirectory, PlaceDirectory } from "./types";
 
-// The same search from anyone gives the same answer, so results are shared for a day.
-// That keeps the free-tier quotas safe. Failed lookups throw, so they're never cached.
+// The same search from anyone gives the same answer, so results are shared for a day in the
+// remote cache (in-memory caches don't survive between serverless instances). Each cache miss
+// spends from a global daily budget, so heavy use can't exhaust a provider's free tier for
+// everyone. Failed or over-budget lookups throw, so they're never cached.
 
 async function cachedCompanySearch(query: string) {
-  "use cache";
+  "use cache: remote";
   cacheLife("days");
+  await spendProviderBudget("logodev");
   return logoDevDirectory(process.env.LOGO_DEV_SECRET_KEY!).search(query, AbortSignal.timeout(PROVIDER_TIMEOUT_MS));
 }
 
 async function cachedCitySearch(query: string) {
-  "use cache";
+  "use cache: remote";
   cacheLife("days");
+  await spendProviderBudget("geoapify");
   return geoapifyDirectory(process.env.GEOAPIFY_API_KEY!).searchCities(query, AbortSignal.timeout(PROVIDER_TIMEOUT_MS));
 }
 

@@ -50,6 +50,8 @@ export function Combobox<T = undefined>({
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const request = useRef<AbortController | null>(null);
 
+  const expanded = open && (loading || options.length > 0);
+
   function cancel() {
     clearTimeout(timer.current);
     request.current?.abort();
@@ -68,6 +70,8 @@ export function Combobox<T = undefined>({
   /** Shows quick picks, or schedules a search for `next`. Each call replaces the previous search. */
   function refresh(next: string) {
     cancel();
+    // The text changed, so a highlighted option no longer matches what Enter would pick.
+    setActive(-1);
     const quick = staticOptions?.(next) ?? [];
     if (quick.length > 0) {
       setOptions(quick);
@@ -127,10 +131,12 @@ export function Combobox<T = undefined>({
         move(-1);
         break;
       case "Enter":
-        // Picking a suggestion must not submit the form.
-        if (open && active >= 0 && options[active]) {
+        // While the list is open, Enter picks the highlighted option or just closes the list;
+        // it never submits the form. With the list closed, Enter submits as usual.
+        if (expanded) {
           event.preventDefault();
-          pick(options[active]);
+          if (active >= 0 && options[active]) pick(options[active]);
+          else close();
         }
         break;
       case "Escape":
@@ -144,8 +150,6 @@ export function Combobox<T = undefined>({
         break;
     }
   }
-
-  const expanded = open && (loading || options.length > 0);
 
   return (
     <div className="relative">

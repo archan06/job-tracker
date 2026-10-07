@@ -1,4 +1,4 @@
-# Job Tracker
+# Landed
 
 Track every job application from the posting you saved to the offer you signed. Drag cards across a Kanban board, filter a sortable table, and see each application's full history on one page.
 

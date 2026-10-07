@@ -5,6 +5,8 @@ import Google from "next-auth/providers/google";
 export const googleEnabled = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
 
 const PUBLIC_PATHS = ["/login", "/register"];
+/** Generated metadata routes with no file extension, so the proxy matcher doesn't skip them. */
+const PUBLIC_ASSETS = ["/apple-icon"];
 
 /**
  * Settings shared by the request proxy and the full Auth.js setup. Kept free of
@@ -21,6 +23,7 @@ export const authConfig = {
       const signedIn = Boolean(auth?.user);
       const { pathname } = nextUrl;
       if (pathname.startsWith("/api/auth")) return true;
+      if (PUBLIC_ASSETS.includes(pathname)) return true;
       if (pathname === "/") return Response.redirect(new URL(signedIn ? "/board" : "/login", nextUrl));
       if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
         // Only page visits are redirected. A form submission (Server Action POST) can't follow

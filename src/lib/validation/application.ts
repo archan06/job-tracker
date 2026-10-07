@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeDomain } from "@/lib/company-domain";
 import { ApplicationSource, ApplicationStatus } from "@/lib/status";
 import { blankToUndefined, dateOnly, optionalText, requiredText } from "./fields";
 
@@ -25,10 +26,26 @@ const jobUrl = z.preprocess(
     .optional(),
 );
 
+/** The company's website, stored as a bare domain so it can key the logo. */
+const companyDomain = z.preprocess(
+  blankToUndefined,
+  z
+    .string()
+    .max(2048, "Enter a website like acme.com")
+    .transform((value, ctx) => {
+      const domain = normalizeDomain(value);
+      if (domain) return domain;
+      ctx.addIssue({ code: "custom", message: "Enter a website like acme.com" });
+      return z.NEVER;
+    })
+    .optional(),
+);
+
 export const applicationInputSchema = z.object({
   company: requiredText("Company", 100),
   title: requiredText("Job title", 150),
   url: jobUrl,
+  companyDomain,
   location: optionalText("Location", 100),
   salaryRange: optionalText("Salary range", 50),
   status: z.preprocess(blankToUndefined, z.enum(ApplicationStatus).default("SAVED")),

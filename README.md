@@ -118,6 +118,8 @@ You need Node.js 20 or newer and a Postgres database. Neon's free tier works wel
    | `TEST_DATABASE_URL` | A second database, such as a Neon branch named `test`. Tests delete its data. |
    | `AUTH_SECRET` | Output of `openssl rand -base64 32` |
    | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | Optional. Leave empty to use email/password only. |
+   | `LOGO_DEV_SECRET_KEY`, `NEXT_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY` | Optional. Company suggestions and logos. See below. |
+   | `GEOAPIFY_API_KEY` | Optional. City suggestions. See below. |
 3. Create the tables and load demo data:
    ```bash
    npx prisma migrate dev
@@ -137,6 +139,10 @@ In Google Cloud Console, create an OAuth client of type "Web application" and ad
 
 Put the client ID and secret in `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`. The Google button appears on the sign-in page once both are set. If someone signs in with Google using an email that already has a password account, the app asks them to use their password instead of silently linking the accounts.
 
+### Company and city suggestions
+
+Company suggestions and logos come from [Logo.dev](https://www.logo.dev) and city suggestions from [Geoapify](https://www.geoapify.com). Both have free plans. From your Logo.dev dashboard, copy the secret key (`sk_...`) into `LOGO_DEV_SECRET_KEY` and the publishable key (`pk_...`) into `NEXT_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY`. Create a Geoapify project and copy its API key into `GEOAPIFY_API_KEY`. All three are optional: without them the fields still work as plain text, past companies are still suggested, and every company shows an initials avatar.
+
 ## Testing
 
 | Command | What it runs |
@@ -151,7 +157,7 @@ Integration and end-to-end tests refuse to run if `TEST_DATABASE_URL` is missing
 ## Deploying to Vercel
 
 1. Import the repository into Vercel.
-2. Add `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET` and, if you use Google sign-in, `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`.
+2. Add `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, the suggestion keys (`LOGO_DEV_SECRET_KEY`, `NEXT_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY`, `GEOAPIFY_API_KEY`) and, if you use Google sign-in, `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`.
 3. Set the build command to apply migrations before building:
    ```bash
    npx prisma migrate deploy && npm run build

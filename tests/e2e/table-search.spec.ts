@@ -11,7 +11,7 @@ test("company search with a trailing space settles instead of re-querying", asyn
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page).toHaveURL(/\/board/);
   await page.goto("/applications/new");
-  await page.getByLabel("Company").fill("Playwright Inc");
+  await page.getByLabel("Company", { exact: true }).fill("Playwright Inc");
   await page.getByLabel("Job title").fill("QA Engineer");
   await page.getByRole("button", { name: "Save application" }).click();
   await expect(page).toHaveURL(/\/applications\/(?!new)[^/]+$/);

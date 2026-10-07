@@ -28,6 +28,7 @@ export default defineConfig({
     timeout: 300_000,
     // The app under test talks to the test database, never the real one.
     // AUTH_TRUST_HOST: Auth.js only trusts the request host automatically on Vercel.
-    env: { DATABASE_URL: testDb, DIRECT_URL: testDb, AUTH_TRUST_HOST: "true" },
+    // SUGGEST_PROVIDER: fixed suggestion data instead of calling Logo.dev and Geoapify.
+    env: { DATABASE_URL: testDb, DIRECT_URL: testDb, AUTH_TRUST_HOST: "true", SUGGEST_PROVIDER: "fake" },
   },
 });

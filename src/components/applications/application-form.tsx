@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Application } from "@/generated/prisma/browser";
 import { useFormAction } from "@/components/forms/use-form-action";
 import { useLocalToday } from "@/components/forms/use-local-today";
+import { CompanyField } from "@/components/applications/company-field";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Field, FormAlert, Input, Select, Textarea } from "@/components/ui/field";
 import { toDateInputValue } from "@/lib/dates";
@@ -45,12 +46,16 @@ export function ApplicationForm(props: Props) {
         <input type="hidden" name="clientToday" value={today} />
 
         <Section title="Role">
-          <Field id="company" label="Company" error={fieldErrors.company}>
-            <Input id="company" name="company" defaultValue={text("company")} autoComplete="organization" invalid={!!fieldErrors.company} />
-          </Field>
-          <Field id="title" label="Job title" error={fieldErrors.title}>
-            <Input id="title" name="title" defaultValue={text("title")} invalid={!!fieldErrors.title} />
-          </Field>
+          <CompanyField
+            initialCompany={text("company")}
+            initialDomain={text("companyDomain")}
+            errors={fieldErrors}
+            between={
+              <Field id="title" label="Job title" error={fieldErrors.title}>
+                <Input id="title" name="title" defaultValue={text("title")} invalid={!!fieldErrors.title} />
+              </Field>
+            }
+          />
           <Field id="url" label="Job posting link" optional error={fieldErrors.url} className="sm:col-span-2">
             <Input id="url" name="url" inputMode="url" placeholder="https://" defaultValue={text("url")} invalid={!!fieldErrors.url} />
           </Field>

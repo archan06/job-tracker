@@ -27,3 +27,6 @@ export async function enforceWriteLimit(userId: string, now = new Date()): Promi
   const { ok } = await rateLimit(`write:${userId}`, WRITES_PER_MINUTE, 60_000, now);
   if (!ok) throw new RateLimitedError();
 }
+
+/** Autocomplete lookups per account per minute. Plenty for typing, too few to drain the providers' free quotas. */
+export const SUGGESTIONS_PER_MINUTE = 120;

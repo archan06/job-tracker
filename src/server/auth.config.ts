@@ -24,6 +24,8 @@ export const authConfig = {
       const { pathname } = nextUrl;
       if (pathname.startsWith("/api/auth")) return true;
       if (PUBLIC_ASSETS.includes(pathname)) return true;
+      // API routes check the session themselves and answer 401; a redirect to /login would hand fetch() an HTML page.
+      if (pathname.startsWith("/api/suggest/")) return true;
       if (pathname === "/") return Response.redirect(new URL(signedIn ? "/board" : "/login", nextUrl));
       if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
         // Only page visits are redirected. A form submission (Server Action POST) can't follow

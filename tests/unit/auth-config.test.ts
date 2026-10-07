@@ -28,3 +28,8 @@ test("signed-out visitors can load the app icons (the login page uses them)", ()
   expect(authorized("/apple-icon", "GET", false)).toBe(true);
   expect(authorized("/apple-iconic-page", "GET", false)).toBe(false);
 });
+
+test("suggestion API calls reach the route, which answers 401 itself instead of a login redirect", () => {
+  expect(authorized("/api/suggest/company?q=acme", "GET", false)).toBe(true);
+  expect(authorized("/api/suggestions-admin", "GET", false)).toBe(false);
+});

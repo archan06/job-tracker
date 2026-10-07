@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, CaretUpDown } from "@phosphor-icons/react/ssr";
 import Link from "next/link";
 import { StatusBadge } from "@/components/applications/status-badge";
+import { CompanyLogo } from "@/components/company-logo";
 import { formatDateOnly } from "@/lib/dates";
 import { SOURCE_LABELS } from "@/lib/status";
 import { toSearchParams } from "@/lib/table-query";
@@ -40,9 +41,12 @@ export function ApplicationsTable({ applications, filters }: { applications: App
           <li key={a.id} className="relative rounded-xl border border-border bg-surface p-4 shadow-card">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <Link href={`/applications/${a.id}`} title={a.company} dir="auto" className="block truncate font-medium text-text after:absolute after:inset-0 after:rounded-xl">
-                  {a.company}
-                </Link>
+                <div className="flex min-w-0 items-center gap-2">
+                  <CompanyLogo company={a.company} domain={a.companyDomain} size="sm" />
+                  <Link href={`/applications/${a.id}`} title={a.company} dir="auto" className="block min-w-0 truncate font-medium text-text after:absolute after:inset-0 after:rounded-xl">
+                    {a.company}
+                  </Link>
+                </div>
                 <p className="mt-0.5 line-clamp-2 text-sm wrap-anywhere text-muted">{a.title}</p>
               </div>
               <StatusBadge status={a.status} />
@@ -71,10 +75,15 @@ export function ApplicationsTable({ applications, filters }: { applications: App
             {applications.map((a) => (
               <tr key={a.id} className="transition-colors hover:bg-surface-muted">
                 <td className="max-w-56 px-4 py-3">
-                  <Link href={`/applications/${a.id}`} title={a.company} dir="auto" className="block truncate font-medium text-text hover:text-primary-text">
-                    {a.company}
-                  </Link>
-                  {a.location && <span className="block truncate text-xs text-muted">{a.location}</span>}
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <CompanyLogo company={a.company} domain={a.companyDomain} size="md" />
+                    <div className="min-w-0">
+                      <Link href={`/applications/${a.id}`} title={a.company} dir="auto" className="block truncate font-medium text-text hover:text-primary-text">
+                        {a.company}
+                      </Link>
+                      {a.location && <span className="block truncate text-xs text-muted">{a.location}</span>}
+                    </div>
+                  </div>
                 </td>
                 <td className="max-w-72 px-4 py-3 text-muted">
                   <span dir="auto" className="line-clamp-2 wrap-anywhere" title={a.title}>{a.title}</span>

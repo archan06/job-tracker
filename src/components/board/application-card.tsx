@@ -3,6 +3,7 @@
 import { useDraggable } from "@dnd-kit/core";
 import { CalendarBlank, MapPin } from "@phosphor-icons/react";
 import Link from "next/link";
+import { CompanyLogo } from "@/components/company-logo";
 import type { BoardCard } from "@/lib/board";
 import { formatDateOnly } from "@/lib/dates";
 import type { ApplicationStatus } from "@/lib/status";
@@ -18,18 +19,21 @@ export function CardBody({ card, onStatusChange, overlay }: Props) {
   return (
     <div className="flex flex-col gap-3">
       <div className="min-w-0">
-        {overlay ? (
-          <p className="truncate font-medium text-text">{card.company}</p>
-        ) : (
-          <Link
-            href={`/applications/${card.id}`}
-            title={card.company}
-            dir="auto"
-            className="block truncate font-medium text-text after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none"
-          >
-            {card.company}
-          </Link>
-        )}
+        <div className="flex min-w-0 items-center gap-2">
+          <CompanyLogo company={card.company} domain={card.companyDomain} size="sm" />
+          {overlay ? (
+            <p className="min-w-0 truncate font-medium text-text">{card.company}</p>
+          ) : (
+            <Link
+              href={`/applications/${card.id}`}
+              title={card.company}
+              dir="auto"
+              className="block min-w-0 truncate font-medium text-text after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none"
+            >
+              {card.company}
+            </Link>
+          )}
+        </div>
         <p dir="auto" className="mt-0.5 line-clamp-2 text-sm wrap-anywhere text-muted" title={card.title}>
           {card.title}
         </p>

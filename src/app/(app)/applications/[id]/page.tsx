@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { DeleteApplicationButton } from "@/components/applications/delete-application-button";
 import { DetailStatusSelect } from "@/components/applications/detail-status-select";
 import { StatusBadge } from "@/components/applications/status-badge";
+import { CompanyLogo } from "@/components/company-logo";
 import { AddEventForm } from "@/components/timeline/add-event-form";
 import { Timeline } from "@/components/timeline/timeline";
 import { ButtonLink } from "@/components/ui/button";
@@ -54,12 +55,15 @@ export default async function ApplicationPage(props: PageProps<"/applications/[i
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 dir="auto" className="text-2xl font-semibold tracking-tight wrap-anywhere text-text">{a.company}</h1>
-            <StatusBadge status={a.status} />
+        <div className="flex min-w-0 items-start gap-4">
+          <CompanyLogo company={a.company} domain={a.companyDomain} size="lg" className="mt-0.5" />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 dir="auto" className="text-2xl font-semibold tracking-tight wrap-anywhere text-text">{a.company}</h1>
+              <StatusBadge status={a.status} />
+            </div>
+            <p dir="auto" className="mt-1 wrap-anywhere text-muted">{a.title}</p>
           </div>
-          <p dir="auto" className="mt-1 wrap-anywhere text-muted">{a.title}</p>
         </div>
         <div className="flex flex-wrap items-start gap-2">
           <DetailStatusSelect id={a.id} company={a.company} status={a.status} />

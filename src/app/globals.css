@@ -52,6 +52,24 @@
   --status-withdrawn: var(--color-amber-500);
   --status-withdrawn-soft: var(--color-amber-50);
   --status-withdrawn-text: var(--color-amber-800);
+
+  /* Company initials avatars: 8 slots picked by hashing the name. */
+  --avatar-1-bg: var(--color-blue-100);
+  --avatar-1-fg: var(--color-blue-800);
+  --avatar-2-bg: var(--color-violet-100);
+  --avatar-2-fg: var(--color-violet-800);
+  --avatar-3-bg: var(--color-emerald-100);
+  --avatar-3-fg: var(--color-emerald-800);
+  --avatar-4-bg: var(--color-amber-100);
+  --avatar-4-fg: var(--color-amber-800);
+  --avatar-5-bg: var(--color-rose-100);
+  --avatar-5-fg: var(--color-rose-800);
+  --avatar-6-bg: var(--color-cyan-100);
+  --avatar-6-fg: var(--color-cyan-800);
+  --avatar-7-bg: var(--color-lime-100);
+  --avatar-7-fg: var(--color-lime-800);
+  --avatar-8-bg: var(--color-fuchsia-100);
+  --avatar-8-fg: var(--color-fuchsia-800);
 }
 
 .dark {
@@ -98,6 +116,23 @@
   --status-withdrawn: var(--color-amber-400);
   --status-withdrawn-soft: oklch(0.29 0.06 70);
   --status-withdrawn-text: var(--color-amber-200);
+
+  --avatar-1-bg: oklch(0.3 0.07 260);
+  --avatar-1-fg: var(--color-blue-200);
+  --avatar-2-bg: oklch(0.3 0.07 293);
+  --avatar-2-fg: var(--color-violet-200);
+  --avatar-3-bg: oklch(0.3 0.07 163);
+  --avatar-3-fg: var(--color-emerald-200);
+  --avatar-4-bg: oklch(0.3 0.07 70);
+  --avatar-4-fg: var(--color-amber-200);
+  --avatar-5-bg: oklch(0.3 0.07 15);
+  --avatar-5-fg: var(--color-rose-200);
+  --avatar-6-bg: oklch(0.3 0.07 215);
+  --avatar-6-fg: var(--color-cyan-200);
+  --avatar-7-bg: oklch(0.3 0.07 130);
+  --avatar-7-fg: var(--color-lime-200);
+  --avatar-8-bg: oklch(0.3 0.07 322);
+  --avatar-8-fg: var(--color-fuchsia-200);
 }
 
 @theme inline {

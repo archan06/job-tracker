@@ -39,6 +39,11 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
         </div>
       </header>
       <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-6 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] sm:px-6 md:pb-12">{children}</main>
+      <footer className="mx-auto hidden w-full max-w-[1400px] px-4 pb-6 text-xs text-subtle sm:px-6 md:block">
+        <a href="https://logo.dev" target="_blank" rel="noreferrer" className="hover:text-muted">
+          Logos provided by Logo.dev
+        </a>
+      </footer>
       <BottomTabBar />
     </div>
   );

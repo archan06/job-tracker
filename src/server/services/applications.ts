@@ -29,6 +29,7 @@ export type ApplicationWithEvents = Application & { events: Event[] };
 const SUMMARY_SELECT = {
   id: true,
   company: true,
+  companyDomain: true,
   title: true,
   location: true,
   status: true,
@@ -55,6 +56,7 @@ export type DayOptions = { today?: Date };
 function fieldsFrom(input: ApplicationInput) {
   return {
     company: input.company,
+    companyDomain: input.companyDomain ?? null,
     title: input.title,
     url: input.url ?? null,
     location: input.location ?? null,
@@ -128,7 +130,7 @@ export type Board = { columns: Record<ApplicationStatus, BoardCard[]>; totals: R
 
 /** The newest `perColumn` cards in each status, plus each column's real total. */
 export async function listBoard(userId: string, perColumn = 50): Promise<Board> {
-  const select = { id: true, company: true, title: true, location: true, status: true, updatedAt: true, dateApplied: true } as const;
+  const select = { id: true, company: true, companyDomain: true, title: true, location: true, status: true, updatedAt: true, dateApplied: true } as const;
   const [counts, ...columns] = await Promise.all([
     db.application.groupBy({ by: ["status"], where: { userId }, _count: { _all: true } }),
     ...STATUSES.map((status) =>

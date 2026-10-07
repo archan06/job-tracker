@@ -3,6 +3,7 @@ import { STATUSES, type ApplicationStatus } from "@/lib/status";
 export type BoardCard = {
   id: string;
   company: string;
+  companyDomain: string | null;
   title: string;
   location: string | null;
   status: ApplicationStatus;

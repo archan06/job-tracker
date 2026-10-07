@@ -5,6 +5,7 @@ import { STATUSES, type ApplicationStatus } from "@/lib/status";
 const c = (id: string, status: ApplicationStatus, t: number): BoardCard => ({
   id,
   company: "A",
+  companyDomain: null,
   title: "T",
   location: null,
   dateApplied: null,

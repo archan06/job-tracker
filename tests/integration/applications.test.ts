@@ -8,9 +8,11 @@ import {
   deleteApplication,
   getApplication,
   listApplications,
+  listBoard,
   updateApplication,
 } from "@/server/services/applications";
 import { NotFoundError } from "@/server/services/errors";
+import { applicationInputSchema } from "@/lib/validation/application";
 import { addEvent } from "@/server/services/events";
 import { makeApplication, makeUser } from "./factories";
 
@@ -181,4 +183,14 @@ describe("calendar dates for status changes", () => {
     const { events } = await getApplication(u.id, a.id);
     expect(events.map((e) => e.type)).toEqual(["NOTE", "STATUS_CHANGE"]);
   });
+});
+
+test("companyDomain is saved normalized, shown in lists and on the board, and cleared by a blank edit", async () => {
+  const user = await makeUser();
+  const app = await makeApplication(user.id, { companyDomain: "stripe.com" });
+  expect(app.companyDomain).toBe("stripe.com");
+  expect((await listApplications(user.id))[0].companyDomain).toBe("stripe.com");
+  expect((await listBoard(user.id)).columns.SAVED[0].companyDomain).toBe("stripe.com");
+  const input = applicationInputSchema.parse({ company: "Stripe", title: "Engineer", companyDomain: "" });
+  expect((await updateApplication(user.id, app.id, input)).companyDomain).toBeNull();
 });

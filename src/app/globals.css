@@ -1,26 +1,195 @@
 @import "tailwindcss";
 
+/* Dark mode follows the `dark` class that next-themes puts on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Color tokens. Components only use these (bg-surface, text-muted, ...), never raw
+ * palette colors, so every screen works in both themes. Status colors come in three
+ * parts: a solid accent, a soft background and a text color that passes WCAG AA on it.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+
+  --background: var(--color-zinc-100);
+  --surface: oklch(0.993 0.002 286);
+  --surface-muted: var(--color-zinc-50);
+  --surface-hover: var(--color-zinc-100);
+  --border: var(--color-zinc-200);
+  --border-strong: var(--color-zinc-300);
+  --text: var(--color-zinc-900);
+  --text-muted: var(--color-zinc-600);
+  --text-subtle: var(--color-zinc-500);
+
+  --primary: var(--color-blue-600);
+  --primary-hover: var(--color-blue-700);
+  --primary-foreground: oklch(0.99 0 0);
+  --primary-text: var(--color-blue-700);
+  --ring: var(--color-blue-500);
+
+  --danger: var(--color-rose-700);
+  --danger-hover: var(--color-rose-800);
+  --danger-soft: var(--color-rose-50);
+  --danger-text: var(--color-rose-700);
+
+  --shadow-color: 240deg 6% 40%;
+
+  --status-saved: var(--color-zinc-400);
+  --status-saved-soft: var(--color-zinc-100);
+  --status-saved-text: var(--color-zinc-700);
+  --status-applied: var(--color-blue-500);
+  --status-applied-soft: var(--color-blue-50);
+  --status-applied-text: var(--color-blue-700);
+  --status-interview: var(--color-violet-500);
+  --status-interview-soft: var(--color-violet-50);
+  --status-interview-text: var(--color-violet-700);
+  --status-offer: var(--color-emerald-500);
+  --status-offer-soft: var(--color-emerald-50);
+  --status-offer-text: var(--color-emerald-800);
+  --status-rejected: var(--color-rose-400);
+  --status-rejected-soft: var(--color-rose-50);
+  --status-rejected-text: var(--color-rose-700);
+  --status-withdrawn: var(--color-amber-500);
+  --status-withdrawn-soft: var(--color-amber-50);
+  --status-withdrawn-text: var(--color-amber-800);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: var(--color-zinc-950);
+  --surface: var(--color-zinc-900);
+  --surface-muted: oklch(0.235 0.005 286);
+  --surface-hover: var(--color-zinc-800);
+  --border: var(--color-zinc-800);
+  --border-strong: var(--color-zinc-700);
+  --text: var(--color-zinc-100);
+  --text-muted: var(--color-zinc-400);
+  --text-subtle: oklch(0.64 0.012 286);
+
+  --primary: var(--color-blue-600);
+  --primary-hover: var(--color-blue-500);
+  --primary-foreground: oklch(0.99 0 0);
+  --primary-text: var(--color-blue-400);
+  --ring: var(--color-blue-400);
+
+  --danger: var(--color-rose-700);
+  --danger-hover: var(--color-rose-600);
+  --danger-soft: oklch(0.27 0.06 15);
+  --danger-text: var(--color-rose-300);
+
+  --shadow-color: 240deg 10% 2%;
+
+  --status-saved: var(--color-zinc-500);
+  --status-saved-soft: var(--color-zinc-800);
+  --status-saved-text: var(--color-zinc-200);
+  --status-applied: var(--color-blue-400);
+  --status-applied-soft: oklch(0.29 0.07 260);
+  --status-applied-text: var(--color-blue-200);
+  --status-interview: var(--color-violet-400);
+  --status-interview-soft: oklch(0.29 0.08 293);
+  --status-interview-text: var(--color-violet-200);
+  --status-offer: var(--color-emerald-400);
+  --status-offer-soft: oklch(0.29 0.06 163);
+  --status-offer-text: var(--color-emerald-200);
+  --status-rejected: var(--color-rose-400);
+  --status-rejected-soft: oklch(0.28 0.07 15);
+  --status-rejected-text: var(--color-rose-200);
+  --status-withdrawn: var(--color-amber-400);
+  --status-withdrawn-soft: oklch(0.29 0.06 70);
+  --status-withdrawn-text: var(--color-amber-200);
 }
 
 @theme inline {
   --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-subtle: var(--text-subtle);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-text: var(--primary-text);
+  --color-ring: var(--ring);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-text: var(--danger-text);
+
+  --color-status-saved: var(--status-saved);
+  --color-status-saved-soft: var(--status-saved-soft);
+  --color-status-saved-text: var(--status-saved-text);
+  --color-status-applied: var(--status-applied);
+  --color-status-applied-soft: var(--status-applied-soft);
+  --color-status-applied-text: var(--status-applied-text);
+  --color-status-interview: var(--status-interview);
+  --color-status-interview-soft: var(--status-interview-soft);
+  --color-status-interview-text: var(--status-interview-text);
+  --color-status-offer: var(--status-offer);
+  --color-status-offer-soft: var(--status-offer-soft);
+  --color-status-offer-text: var(--status-offer-text);
+  --color-status-rejected: var(--status-rejected);
+  --color-status-rejected-soft: var(--status-rejected-soft);
+  --color-status-rejected-text: var(--status-rejected-text);
+  --color-status-withdrawn: var(--status-withdrawn);
+  --color-status-withdrawn-soft: var(--status-withdrawn-soft);
+  --color-status-withdrawn-text: var(--status-withdrawn-text);
+
+  --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.08), 0 2px 6px hsl(var(--shadow-color) / 0.06);
+  --shadow-raised: 0 2px 4px hsl(var(--shadow-color) / 0.1), 0 12px 28px hsl(var(--shadow-color) / 0.14);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--text);
+}
+
+html {
+  /* No grey flash on tap; the components have their own :active feedback. */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Controls fire on tap without the double-tap-zoom wait, and long-press doesn't select their labels. */
+button,
+[role="button"],
+[role="menuitem"],
+[role="menuitemradio"],
+select {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Motion: short, strong ease-out for things appearing; skipped for reduced motion. */
+@theme {
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .menu-enter {
+    transition:
+      opacity 150ms var(--ease-out-strong),
+      transform 150ms var(--ease-out-strong);
+    @starting-style {
+      opacity: 0;
+      transform: scale(0.97) translateY(-4px);
+    }
+  }
+  .toast-enter {
+    transition:
+      opacity 200ms var(--ease-out-strong),
+      transform 200ms var(--ease-out-strong);
+    @starting-style {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
 }

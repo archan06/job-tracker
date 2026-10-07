@@ -14,7 +14,7 @@ Portfolio project. Built in phases; work stops after each phase for review, test
 ## Data model
 - User: id, email, name, createdAt
 - Application: id, userId, company, title, url, location, salaryRange, status, source (referral, LinkedIn, company site, cold apply, other), dateApplied, description, notes, createdAt, updatedAt
-- Status enum: SAVED, APPLIED, PHONE_SCREEN, INTERVIEW, OFFER, REJECTED, WITHDRAWN
+- Status enum: SAVED, APPLIED, INTERVIEW, OFFER, REJECTED, WITHDRAWN (PHONE_SCREEN removed 2026-10-07; see change log)
 - Event: id, applicationId, type (STATUS_CHANGE, INTERVIEW, EMAIL, NOTE, FOLLOW_UP), fromStatus, toStatus, date, notes
 - Reminder: id, applicationId, dueAt, sent
 
@@ -41,7 +41,7 @@ Every status change must create an Event row (event-sourced history) instead of 
 
 ## Phase 3: Analytics dashboard
 - Totals by status
-- Funnel: Applied → Phone Screen → Interview → Offer, with conversion rates
+- Funnel: Applied → Interview → Offer, with conversion rates
 - Response rate and average days to first response (computed from Events)
 - Breakdown by source showing which sources convert best
 - Applications per week over time (use Recharts)
@@ -69,3 +69,6 @@ Every status change must create an Event row (event-sourced history) instead of 
 - UI direction: `design-taste-frontend` skill, steered toward **simple and clean, not stark minimalism**: soft neutral surfaces, clear hierarchy, comfortable spacing, rounded cards with subtle borders/shadows, and color used purposefully (each status has its own accent color). Friendly and easy to scan, not monochrome or austere.
 - **Light and dark mode** (added 2026-10-07): a theme toggle with Light / Dark / System options, defaulting to System, remembered per browser, with no flash of the wrong theme on page load. Every screen and every status color must be readable in both themes.
 - Project location: `~/job-tracker`.
+
+## Change log
+- 2026-10-07: Removed the PHONE_SCREEN status at the owner's request. Migration `20261007200000_remove_phone_screen` moves existing Phone screen applications and history to INTERVIEW and drops the resulting Interview → Interview events. The Phase 3 funnel is now Applied → Interview → Offer, and a "first response" is the first move out of Applied to Interview, Offer or Rejected.

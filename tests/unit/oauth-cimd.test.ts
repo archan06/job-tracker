@@ -21,7 +21,8 @@ test("a valid document gives the client's name and redirect URIs", async () => {
 });
 
 test("the name falls back to the host when missing", async () => {
-  const { client_name: _, ...doc } = okDoc;
+  const doc: Partial<typeof okDoc> = { ...okDoc };
+  delete doc.client_name;
   expect((await fetchClientMetadata(URL_ID, { lookup: publicLookup, fetchImpl: respond(doc) })).name).toBe("claude.ai");
 });
 

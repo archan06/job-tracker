@@ -77,7 +77,7 @@ const classificationFields = (c: Classification) => ({
   confidence: c.confidence,
   company: c.company?.slice(0, 100) ?? null,
   jobTitle: c.jobTitle?.slice(0, 150) ?? null,
-  companyDomain: c.companyDomain,
+  companyDomain: employerDomain(c),
   interviewAt: c.interviewAt ? validDate(c.interviewAt) : null,
   summary: c.summary,
 });
@@ -94,11 +94,10 @@ const changeFields = (record: EmailChangeRecord, created: boolean) => ({
   applicationUpdatedAt: record.updatedAt,
 });
 
-/** The company's own website from the classifier or the sender, never a job board's. */
-function employerDomain(c: Classification, from: string): string | null {
-  const fromModel = c.companyDomain ? normalizeDomain(c.companyDomain) : null;
-  if (fromModel && !isAtsDomain(fromModel)) return fromModel;
-  return senderDomain(from);
+/** The company's own website, as read from the email by the classifier, never a job board's or a personal mailbox's. */
+function employerDomain(c: Classification): string | null {
+  const domain = c.companyDomain ? normalizeDomain(c.companyDomain.slice(0, 253)) : null;
+  return domain && !isAtsDomain(domain) && senderDomain(`x@${domain}`) === domain ? domain : null;
 }
 
 /** Classifies (or recognizes) one fetched email and decides what to do. Returns the fields to store. */
@@ -133,7 +132,7 @@ async function process(userId: string, email: FetchedEmail, classifier: EmailCla
     }
     case "CREATE": {
       const change = changeFor(c, email.date, null, false);
-      const input = { company: c.company!, title: c.jobTitle!, companyDomain: employerDomain(c, email.from), status: "APPLIED" as const };
+      const input = { company: c.company!, title: c.jobTitle!, companyDomain: employerDomain(c), status: "APPLIED" as const };
       return { ...fields, apply: (tx: Parameters<typeof applyEmailChange>[0]) => createApplicationFromEmail(tx, userId, input, change), created: true };
     }
   }
@@ -301,7 +300,7 @@ export async function createFromReview(userId: string, id: string): Promise<void
     const record = await createApplicationFromEmail(
       tx,
       userId,
-      { company: email.company!, title: email.jobTitle!, companyDomain: email.companyDomain ? normalizeDomain(email.companyDomain) : null, status: targetStatus(kind, null) },
+      { company: email.company!, title: email.jobTitle!, companyDomain: email.companyDomain, status: targetStatus(kind, null) },
       reviewedChange(email, null),
     );
     await tx.inboundEmail.update({ where: { id }, data: changeFields(record, true) });

@@ -74,3 +74,9 @@ test("several applications at one company are told apart by title, or sent to re
 test("other users' applications can't match: decide only ever sees what it is given", () => {
   expect(decideEmail(c({ kind: "OFFER", company: "Nobody" }), [app()], null)).toMatchObject({ kind: "REVIEW" });
 });
+
+test("a sender-domain match never overrides a company name that disagrees", () => {
+  const stripe = app({ id: "s", company: "Stripe", companyDomain: "stripe.com", status: "APPLIED" });
+  expect(decideEmail(c({ kind: "REJECTION", company: "Acme" }), [stripe], "stripe.com")).toMatchObject({ kind: "REVIEW" });
+  expect(decideEmail(c({ kind: "REJECTION", company: null }), [stripe], "stripe.com")).toMatchObject({ kind: "UPDATE", applicationId: "s" });
+});

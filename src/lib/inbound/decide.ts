@@ -27,12 +27,23 @@ export const CONFIDENCE_THRESHOLD = 0.75;
 
 const words = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
+/** "stripe" and "stripe payments": one name's words begin the other's. */
+function sameNameStart(a: string, b: string): boolean {
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  return short.length > 0 && (long === short || long.startsWith(`${short} `));
+}
+
 /** The single application this email is about, or why there isn't exactly one. */
 function match(c: Classification, candidates: Candidate[], sender: string | null): Candidate | "none" | "several" {
   const company = c.company ? normalizeCompany(c.company) : "";
-  const found = candidates.filter(
-    (a) => (company && normalizeCompany(a.company) === company) || (sender !== null && a.companyDomain === sender),
-  );
+  // A named company must agree with the application: exactly, or, when the sender's domain also matches,
+  // as a name variant ("Stripe" / "Stripe Payments"). The domain alone decides only if no company is named.
+  const found = candidates.filter((a) => {
+    const domainMatch = sender !== null && a.companyDomain === sender;
+    if (!company) return domainMatch;
+    const name = normalizeCompany(a.company);
+    return name === company || (domainMatch && sameNameStart(name, company));
+  });
   if (found.length <= 1) return found[0] ?? "none";
   if (!c.jobTitle) return "several";
   const title = words(c.jobTitle);

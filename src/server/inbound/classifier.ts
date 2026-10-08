@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { jsonSchemaOutputFormat } from "@anthropic-ai/sdk/helpers/json-schema";
 import { z } from "zod";
 import { EMAIL_KINDS, type Classification } from "@/lib/inbound/decide";
 
@@ -13,6 +13,7 @@ export interface EmailClassifier {
   classify(email: EmailForClassification): Promise<Classification>;
 }
 
+/** Validates what comes back; the request below carries the same shape as an exact JSON schema. */
 const outputSchema = z.object({
   kind: z.enum(EMAIL_KINDS),
   confidence: z.number().describe("0 to 1: how sure you are about kind"),
@@ -22,6 +23,27 @@ const outputSchema = z.object({
   interviewAt: z.string().nullable().describe("ISO 8601 date-time of a scheduled interview, if one is given"),
   summary: z.string().describe("One short line, under 120 characters, e.g. 'Phone screen invite for Tue 2pm'"),
 });
+
+const nullableString = (description: string) => ({ anyOf: [{ type: "string" }, { type: "null" }], description }) as const;
+
+/**
+ * Sent untransformed: the SDK's default transform moves `enum` into a description, which would only
+ * ask the model to pick a valid kind instead of requiring it.
+ */
+const requestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["kind", "confidence", "company", "jobTitle", "companyDomain", "interviewAt", "summary"],
+  properties: {
+    kind: { type: "string", enum: [...EMAIL_KINDS] },
+    confidence: { type: "number", description: "0 to 1: how sure you are about kind" },
+    company: nullableString("The hiring company (not the job board or ATS)"),
+    jobTitle: nullableString("The job title"),
+    companyDomain: nullableString("The hiring company's own website domain, if clear, e.g. stripe.com"),
+    interviewAt: nullableString("ISO 8601 date-time of a scheduled interview, if one is given"),
+    summary: { type: "string", description: "One short line, under 120 characters, e.g. 'Phone screen invite for Tue 2pm'" },
+  },
+} as const;
 
 const SYSTEM = `You sort emails a job seeker forwarded from their inbox. Classify each one:
 - APPLICATION_CONFIRMATION: the company received their application
@@ -46,11 +68,12 @@ export function haikuClassifier(client: Anthropic): EmailClassifier {
             content: `<email>\nFrom: ${from}\nDate: ${date.toISOString()}\nSubject: ${subject}\n\n${text.slice(0, MAX_INPUT_CHARS)}\n</email>`,
           },
         ],
-        output_config: { format: zodOutputFormat(outputSchema) },
+        output_config: { format: jsonSchemaOutputFormat(requestSchema, { transform: false }) },
       });
       if (response.stop_reason === "refusal") throw new Error("Classifier refused");
-      const parsed = response.parsed_output;
-      if (!parsed) throw new Error("Classifier output didn't parse");
+      const checked = outputSchema.safeParse(response.parsed_output);
+      if (!checked.success) throw new Error("Classifier output didn't match the schema");
+      const parsed = checked.data;
       return { ...parsed, confidence: Math.min(Math.max(parsed.confidence, 0), 1), summary: parsed.summary.slice(0, 120) };
     },
   };

@@ -47,6 +47,9 @@ test("sender domain is the registrable domain, and job boards don't count", () =
   expect(senderDomain("notifications@hire.lever.co")).toBeNull();
   expect(senderDomain("x@myworkday.com")).toBeNull();
   expect(senderDomain("not an email")).toBeNull();
+  for (const free of ["me@gmail.com", "me@outlook.com", "me@yahoo.com", "me@icloud.com", "me@hotmail.com", "me@proton.me", "recruiter@googlemail.com"]) {
+    expect(senderDomain(free)).toBeNull();
+  }
   expect(isAtsDomain("ashbyhq.com")).toBe(true);
   expect(isAtsDomain("stripe.com")).toBe(false);
 });

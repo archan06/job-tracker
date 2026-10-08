@@ -16,6 +16,12 @@ const ATS_DOMAINS = new Set([
 
 export const isAtsDomain = (domain: string) => ATS_DOMAINS.has(domain.toLowerCase());
 
+/** Personal mailboxes: an email from these says nothing about which company it's about (e.g. forwarded by hand). */
+const FREE_MAIL = new Set([
+  "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "msn.com", "yahoo.com", "ymail.com",
+  "icloud.com", "me.com", "mac.com", "aol.com", "proton.me", "protonmail.com", "pm.me", "gmx.com", "mail.com", "zoho.com",
+]);
+
 // Second-level labels under which registrations sit one level deeper (acme.co.uk).
 const SECOND_LEVEL = new Set(["co", "com", "org", "net", "ac", "gov", "edu"]);
 
@@ -26,5 +32,5 @@ export function senderDomain(from: string): string | null {
   const labels = host.split(".");
   const take = labels.length >= 3 && SECOND_LEVEL.has(labels.at(-2)!) && labels.at(-1)!.length === 2 ? 3 : 2;
   const domain = labels.slice(-take).join(".");
-  return isAtsDomain(domain) ? null : domain;
+  return isAtsDomain(domain) || FREE_MAIL.has(domain) ? null : domain;
 }

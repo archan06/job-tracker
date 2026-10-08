@@ -120,7 +120,7 @@ test("revoking either token ends the connection", async () => {
   await expect(revokeToken("garbage")).resolves.toBeUndefined();
 });
 
-test("re-authorizing the same app reuses one connection with fresh tokens", async () => {
+test("a second install of the same app gets its own connection; the first keeps working", async () => {
   const s = await setup();
   const first = await exchange(s);
   const code2 = await createAuthorizationCode(
@@ -129,8 +129,39 @@ test("re-authorizing the same app reuses one connection with fresh tokens", asyn
   );
   const second = await exchange({ code: code2, clientId: s.clientId }, {}, at(MIN + 5000));
   expect(second.scope).toBe("applications:read");
-  expect(await verifyAccessToken(first.access_token, RESOURCE, at(2 * MIN))).toBeNull();
-  expect(await db.oAuthGrant.count({ where: { userId: s.user.id } })).toBe(1);
+  expect(await verifyAccessToken(first.access_token, RESOURCE, at(2 * MIN))).not.toBeNull();
+  expect(await verifyAccessToken(second.access_token, RESOURCE, at(2 * MIN))).not.toBeNull();
+  await expect(refreshGrant({ refreshToken: first.refresh_token, clientId: s.clientId }, at(3 * MIN))).resolves.toBeTruthy();
+  expect(await listGrants(s.user.id)).toHaveLength(2);
+});
+
+test("a retried or concurrent refresh within a minute fails without disconnecting", async () => {
+  const s = await setup();
+  const first = await exchange(s);
+  const second = await refreshGrant({ refreshToken: first.refresh_token, clientId: s.clientId }, at(MIN));
+  await expect(refreshGrant({ refreshToken: first.refresh_token, clientId: s.clientId }, at(MIN + 20_000))).rejects.toMatchObject({ code: "invalid_grant" });
+  expect(await verifyAccessToken(second.access_token, RESOURCE, at(2 * MIN))).not.toBeNull();
+});
+
+test("parallel refreshes with the same token: one wins, the connection survives", async () => {
+  const s = await setup();
+  const first = await exchange(s);
+  const results = await Promise.allSettled(
+    [0, 1, 2].map(() => refreshGrant({ refreshToken: first.refresh_token, clientId: s.clientId }, at(MIN))),
+  );
+  const won = results.filter((r) => r.status === "fulfilled") as PromiseFulfilledResult<{ access_token: string }>[];
+  expect(won).toHaveLength(1);
+  expect(await verifyAccessToken(won[0].value.access_token, RESOURCE, at(2 * MIN))).not.toBeNull();
+});
+
+test("used and expired codes are cleaned up as new ones are issued", async () => {
+  const s = await setup();
+  await exchange(s);
+  await createAuthorizationCode(
+    { clientId: s.clientId, userId: s.user.id, redirectUri: REDIRECT, codeChallenge: CHALLENGE, scopes: ["applications:read"], resource: RESOURCE },
+    at(2 * 60 * MIN),
+  );
+  expect(await db.oAuthCode.count({ where: { userId: s.user.id } })).toBe(1);
 });
 
 test("listGrants shows active connections; disconnect only works on your own", async () => {

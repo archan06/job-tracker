@@ -192,7 +192,7 @@ model OAuthCode {
   user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-/// One connection between a user and an app. Tokens are stored only as SHA-256 hashes.
+/// One connection (one install) between a user and an app. Tokens are stored only as SHA-256 hashes.
 model OAuthGrant {
   id                   String    @id @default(cuid())
   userId               String
@@ -209,8 +209,13 @@ model OAuthGrant {
   lastUsedAt           DateTime?
   revokedAt            DateTime?
 
+  /// The authorization code that created this connection; a replayed code revokes only this one.
+  codeHash  String?   @unique
+  /// When the refresh token was last rotated; a retry within a minute isn't treated as theft.
+  rotatedAt DateTime?
+
   client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
   user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, clientId])
+  @@index([userId, clientId])
 }

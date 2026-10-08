@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { loginSchema } from "@/lib/validation/auth";
 import { db } from "@/server/db";
 import { clientIp } from "@/server/client-ip";
+import { emailSender } from "@/server/mail/sender";
+import { sendVerification } from "@/server/services/email-verification";
 import { rateLimit } from "@/server/services/rate-limit";
 import { verifyCredentials } from "@/server/services/users";
 import { authConfig } from "./auth.config";
@@ -13,6 +15,11 @@ const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
 class TooManyAttempts extends CredentialsSignin {
   code = "rate_limited";
+}
+
+/** Right password, but the address hasn't been confirmed. A fresh link has been sent. */
+class Unverified extends CredentialsSignin {
+  code = "unverified";
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -25,6 +32,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   adapter: PrismaAdapter(db),
+  callbacks: {
+    ...authConfig.callbacks,
+    // Google has confirmed the address: record it, so the account counts as verified everywhere.
+    async jwt(params) {
+      const { user, account, profile } = params;
+      if (user?.id && account?.provider === "google" && profile?.email_verified) {
+        const now = new Date();
+        await db.user.updateMany({ where: { id: user.id, emailVerified: null }, data: { emailVerified: now, unverifiedExpiresAt: null } });
+        return authConfig.callbacks.jwt({ ...params, user: { ...user, emailVerified: now } });
+      }
+      return authConfig.callbacks.jwt(params);
+    },
+  },
   providers: [
     ...authConfig.providers,
     Credentials({
@@ -38,7 +58,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           rateLimit(`login:ip:${clientIp(request.headers)}`, 50, LOGIN_WINDOW_MS),
         ]);
         if (!perAccount.ok || !perNetwork.ok) throw new TooManyAttempts();
-        return verifyCredentials(parsed.data.email, parsed.data.password);
+        const user = await verifyCredentials(parsed.data.email, parsed.data.password);
+        if (user && !user.emailVerified) {
+          await sendVerification(user.id, clientIp(request.headers), emailSender());
+          throw new Unverified();
+        }
+        return user;
       },
     }),
   ],

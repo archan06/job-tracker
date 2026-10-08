@@ -49,6 +49,13 @@ test("a code exchanges once for tokens that verify for the right resource", asyn
   expect(await verifyAccessToken(tokens.access_token, RESOURCE, at(61 * MIN))).toBeNull();
 });
 
+test("access tokens of unverified users are rejected", async () => {
+  const s = await setup();
+  const tokens = await exchange(s);
+  await db.user.update({ where: { id: s.user.id }, data: { emailVerified: null } });
+  expect(await verifyAccessToken(tokens.access_token, RESOURCE, at(MIN))).toBeNull();
+});
+
 test("tokens are stored only as hashes", async () => {
   const s = await setup();
   const tokens = await exchange(s);

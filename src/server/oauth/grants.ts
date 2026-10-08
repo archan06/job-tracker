@@ -135,10 +135,14 @@ export async function revokeToken(token: string, now = new Date()): Promise<void
 
 export type VerifiedToken = { userId: string; clientId: string; scopes: string[]; expiresAt: Date };
 
-/** The user and scopes behind an access token, or null if it's unknown, expired, revoked or for another resource. */
+/** The user and scopes behind an access token, or null if it's unknown, expired, revoked, for another resource, or its user is unverified. */
 export async function verifyAccessToken(token: string, resource: string, now = new Date()): Promise<VerifiedToken | null> {
-  const grant = await db.oAuthGrant.findUnique({ where: { accessTokenHash: hashToken(token) } });
+  const grant = await db.oAuthGrant.findUnique({
+    where: { accessTokenHash: hashToken(token) },
+    include: { user: { select: { emailVerified: true } } },
+  });
   if (!grant || grant.revokedAt || !grant.accessExpiresAt || grant.accessExpiresAt <= now) return null;
+  if (!grant.user.emailVerified) return null;
   if (grant.resource !== resource) return null;
   await db.oAuthGrant.update({ where: { id: grant.id }, data: { lastUsedAt: now } });
   return { userId: grant.userId, clientId: grant.clientId, scopes: grant.scopes, expiresAt: grant.accessExpiresAt };

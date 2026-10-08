@@ -1,6 +1,7 @@
 import { OAuthError } from "@/server/oauth/errors";
 import { exchangeCode, refreshGrant } from "@/server/oauth/grants";
-import { CORS_HEADERS, corsPreflight, noStoreJson } from "@/server/oauth/http";
+import { clientIp } from "@/server/client-ip";
+import { CORS_HEADERS, MAX_CLIENT_ID_LENGTH, corsPreflight, noStoreJson } from "@/server/oauth/http";
 import { rateLimit } from "@/server/services/rate-limit";
 
 const TOKEN_REQUESTS_PER_MINUTE = 60;
@@ -21,8 +22,9 @@ export async function POST(request: Request) {
   const field = (name: string) => params.get(name) ?? "";
   const clientId = field("client_id");
   try {
-    if (!clientId) throw new OAuthError("invalid_request", "client_id is required");
-    const limit = await rateLimit(`oauth:token:${clientId}`, TOKEN_REQUESTS_PER_MINUTE, 60_000);
+    if (!clientId || clientId.length > MAX_CLIENT_ID_LENGTH) throw new OAuthError("invalid_request", "A valid client_id is required");
+    // Per network and client: a client_id is public, so limiting by it alone would let anyone lock out its real users.
+    const limit = await rateLimit(`oauth:token:${clientIp(request.headers)}:${clientId}`, TOKEN_REQUESTS_PER_MINUTE, 60_000);
     if (!limit.ok) throw new OAuthError("slow_down", "Too many token requests. Try again shortly.", 429);
     const resource = params.get("resource") ?? undefined;
     switch (field("grant_type")) {

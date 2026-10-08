@@ -46,4 +46,6 @@ test("a signed-in visitor on /login with a safe callbackUrl goes there instead o
   expect(result.headers.get("location")).toBe("http://localhost/oauth/authorize?client_id=x");
   const evil = authorized("/login?callbackUrl=https%3A%2F%2Fevil.example", "GET", true) as Response;
   expect(evil.headers.get("location")).toBe("http://localhost/board");
+  const tab = authorized("/login?callbackUrl=%2F%09%2Fevil.example", "GET", true) as Response;
+  expect(tab.headers.get("location")).toBe("http://localhost/board");
 });

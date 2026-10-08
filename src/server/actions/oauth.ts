@@ -17,10 +17,7 @@ export async function decideConsentAction(formData: FormData): Promise<void> {
   const origin = originFromHeaders(await headers());
   const query = new URLSearchParams(String(formData.get("query") ?? ""));
   const result = await validateAuthorizeRequest(Object.fromEntries(query), origin);
-  if (!result.ok) {
-    if (result.redirect) redirect(result.redirect.toString());
-    redirect(`/oauth/authorize?${query}`);
-  }
+  if (!result.ok) redirect(`/oauth/authorize?${query}`);
   const { client, redirectUri, state, scopes, codeChallenge, resource } = result.request;
   if (formData.get("decision") !== "allow") {
     redirect(clientRedirect(redirectUri, origin, state, { error: "access_denied", error_description: "The user denied access" }).toString());

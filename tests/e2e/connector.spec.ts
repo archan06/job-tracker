@@ -15,12 +15,12 @@ async function registerUser(page: Page) {
   return email;
 }
 
-async function authorizeUrl(page: Page) {
+async function authorizeUrl(page: Page, clientName = "Test Assistant") {
   // API calls don't carry the page's fake network header, so give registration its own (it's limited per network).
   const ip = `198.51.${Math.floor(Math.random() * 250) + 1}.${Math.floor(Math.random() * 250) + 1}`;
   const reg = await page.request.post("/oauth/register", {
     headers: { "x-forwarded-for": ip },
-    data: { client_name: "Test Assistant", redirect_uris: [REDIRECT] },
+    data: { client_name: clientName, redirect_uris: [REDIRECT] },
   });
   expect(reg.status()).toBe(201);
   const { client_id } = await reg.json();
@@ -53,10 +53,11 @@ test("signed out: sign in, see consent, Allow, and land back on the app with a c
   await page.getByRole("button", { name: "Sign in" }).click();
 
   await expect(page.getByRole("heading", { name: /Test Assistant/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /client\.example/ })).toBeVisible();
   await expect(page.getByText("View your applications")).toBeVisible();
   await expect(page.getByText("Add and update applications")).toBeVisible();
   await expect(page.getByText(/Unverified app/)).toBeVisible();
-  await expect(page.getByText("client.example")).toBeVisible();
+  await expect(page.getByText("client.example", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Allow" }).click();
 
   await page.waitForURL(/^https:\/\/client\.example\/callback/);
@@ -116,4 +117,18 @@ test("Connected apps lists the app; Disconnect removes it and its token stops wo
   await expect(page.getByText("Test Assistant")).toBeHidden();
   await expect(page.getByText(/No apps connected/)).toBeVisible();
   expect((await mcp()).status()).toBe(401);
+});
+
+test("signed-out visitors go to sign-in before Landed does anything for the app, even for a bad request", async ({ browser }) => {
+  const page = await (await browser.newContext()).newPage();
+  await useFreshNetwork(page);
+  await page.goto(`/oauth/authorize?${new URLSearchParams({ client_id: "https://attacker.example/c.json", response_type: "nope" })}`);
+  await expect(page).toHaveURL(/\/login\?callbackUrl=/);
+});
+
+test("an app calling itself Claude from another site gets a clear warning", async ({ page }) => {
+  await registerUser(page);
+  const { url } = await authorizeUrl(page, "Claude");
+  await page.goto(url);
+  await expect(page.getByText(/This isn't the official Claude/)).toBeVisible();
 });

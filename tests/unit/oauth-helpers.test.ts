@@ -25,6 +25,7 @@ test("scopes: empty means both, unknown means invalid, duplicates collapse", () 
   expect(parseScopes("applications:read applications:read")).toEqual(["applications:read"]);
   expect(parseScopes("applications:write applications:read")).toEqual(["applications:read", "applications:write"]);
   expect(parseScopes("applications:delete")).toBeNull();
+  expect(parseScopes("openid applications:read offline_access")).toEqual(["applications:read"]);
 });
 
 test.each([

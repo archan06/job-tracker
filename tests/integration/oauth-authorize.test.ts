@@ -36,22 +36,23 @@ test.each([
 ])("never redirects for %s: shows an error page", async (_, overrides) => {
   const result = await validateAuthorizeRequest(await params(overrides), ORIGIN);
   expect(result.ok).toBe(false);
-  expect(result.ok === false && result.redirect).toBeUndefined();
+  expect("redirect" in result).toBe(false);
 });
 
 test.each([
-  ["response_type", { response_type: "token" }, "unsupported_response_type"],
-  ["missing PKCE", { code_challenge: undefined }, "invalid_request"],
-  ["plain PKCE", { code_challenge_method: "plain" }, "invalid_request"],
-  ["bad challenge", { code_challenge: "short" }, "invalid_request"],
-  ["unknown scope", { scope: "applications:delete" }, "invalid_scope"],
-  ["other resource", { resource: "https://other.test/api/mcp" }, "invalid_target"],
-])("redirects back with an error for %s", async (_, overrides, error) => {
+  ["response_type", { response_type: "token" }],
+  ["missing PKCE", { code_challenge: undefined }],
+  ["plain PKCE", { code_challenge_method: "plain" }],
+  ["bad challenge", { code_challenge: "short" }],
+  ["unknown scope only", { scope: "applications:delete" }],
+  ["other resource", { resource: "https://other.test/api/mcp" }],
+])("shows an error page and never redirects for %s (no open redirector)", async (_, overrides) => {
   const result = await validateAuthorizeRequest(await params(overrides), ORIGIN);
   expect(result.ok).toBe(false);
-  const url = result.ok === false ? result.redirect! : null;
-  expect(url?.origin + url!.pathname).toBe(REDIRECT);
-  expect(url!.searchParams.get("error")).toBe(error);
-  expect(url!.searchParams.get("state")).toBe("xyz");
-  expect(url!.searchParams.get("iss")).toBe(ORIGIN);
+  expect("redirect" in result).toBe(false);
+});
+
+test("unknown scopes are ignored when a known one is also requested", async () => {
+  const result = await validateAuthorizeRequest(await params({ scope: "openid offline_access applications:read" }), ORIGIN);
+  expect(result).toMatchObject({ ok: true, request: { scopes: ["applications:read"] } });
 });

@@ -14,6 +14,7 @@ import {
   inboxBadgeCount,
   ignoreEmail,
   ingestEmail,
+  latestForwardingConfirmation,
   listInbox,
   regenerateInboundAddress,
   retryEmail,
@@ -178,6 +179,21 @@ test("non-job emails are ignored; the Gmail forwarding code is captured without 
   await ingestEmail(event(to, { from: "forwarding-noreply@google.com" }), deps);
   expect(classify).not.toHaveBeenCalled();
   expect((await listInbox(u.id, "IGNORED")).find((e) => e.forwardingCode)?.forwardingCode).toBe("123456789");
+});
+
+test("Gmail's newer link-only confirmation stores the link, without an AI call and without failing", async () => {
+  const u = await makeUser();
+  const to = await addressFor(u.id);
+  const link = "https://mail-settings.google.com/mail/vf-%5BABC%5D-XYZ";
+  const { deps, classify } = harness(new Error("should not be called"), {
+    from: "forwarding-noreply@google.com",
+    subject: "(Gmail Forwarding Confirmation - Receive Mail from a@gmail.com",
+    text: `please click the link below to confirm the request:\n\n${link}\n\nIf you click the link`,
+  });
+  await ingestEmail(event(to, { from: "forwarding-noreply@google.com" }), deps);
+  expect(classify).not.toHaveBeenCalled();
+  expect(await listInbox(u.id, "FAILED")).toHaveLength(0);
+  expect(await latestForwardingConfirmation(u.id)).toEqual({ code: null, link });
 });
 
 test("a classifier failure is stored as couldn't-read and can be retried", async () => {

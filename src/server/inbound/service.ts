@@ -6,7 +6,7 @@ import { todayUtc } from "@/lib/dates";
 import { inboundAddress, newInboundToken, tokenFromRecipients } from "@/lib/inbound/address";
 import { isAtsDomain, senderDomain } from "@/lib/inbound/companies";
 import { decideEmail, targetStatus, type Classification } from "@/lib/inbound/decide";
-import { gmailForwardingCode } from "@/lib/inbound/forwarding";
+import { gmailForwardingConfirmation } from "@/lib/inbound/forwarding";
 import { snippet } from "@/lib/inbound/text";
 import { db } from "@/server/db";
 import {
@@ -123,8 +123,10 @@ function employerDomain(c: Classification): string | null {
 
 /** Classifies (or recognizes) one fetched email and decides what to do. Returns the fields to store. */
 async function process(userId: string, email: FetchedEmail, classifier: EmailClassifier) {
-  const forwardingCode = gmailForwardingCode(email.from, email.subject, email.text);
-  if (forwardingCode) return { kind: "GMAIL_FORWARDING_CONFIRMATION" as const, state: "IGNORED" as const, forwardingCode };
+  const forwarding = gmailForwardingConfirmation(email.from, email.subject, email.text);
+  if (forwarding) {
+    return { kind: "GMAIL_FORWARDING_CONFIRMATION" as const, state: "IGNORED" as const, forwardingCode: forwarding.code, forwardingLink: forwarding.link };
+  }
 
   let c: Classification;
   try {
@@ -256,14 +258,14 @@ export function inboxBadgeCount(userId: string): Promise<number> {
   return db.inboundEmail.count({ where: { userId, state: { in: ["NEEDS_REVIEW", "FAILED"] } } });
 }
 
-/** The latest Gmail forwarding confirmation code, shown during setup. */
-export async function latestForwardingCode(userId: string): Promise<string | null> {
+/** The latest Gmail forwarding confirmation (a code, or a link in newer emails), shown during setup. */
+export async function latestForwardingConfirmation(userId: string): Promise<{ code: string | null; link: string | null } | null> {
   const email = await db.inboundEmail.findFirst({
     where: { userId, kind: "GMAIL_FORWARDING_CONFIRMATION" },
     orderBy: { createdAt: "desc" },
-    select: { forwardingCode: true },
+    select: { forwardingCode: true, forwardingLink: true },
   });
-  return email?.forwardingCode ?? null;
+  return email ? { code: email.forwardingCode, link: email.forwardingLink } : null;
 }
 
 export async function undoEmail(userId: string, id: string): Promise<void> {

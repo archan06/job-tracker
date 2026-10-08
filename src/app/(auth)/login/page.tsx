@@ -4,7 +4,6 @@ import { Suspense } from "react";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { safeCallbackPath } from "@/lib/callback-path";
 import { googleEnabled } from "@/server/auth.config";
-import { Skeleton } from "@/components/ui/skeleton";
 import { AuthCard } from "../auth-card";
 import { LoginForm } from "./login-form";
 
@@ -36,8 +35,7 @@ export default function LoginPage(props: PageProps<"/login">) {
         </>
       }
     >
-      {/* A skeleton, not a second copy of the form: anything typed into a placeholder form would be wiped when the real one streams in. */}
-      <Suspense fallback={<Skeleton className="h-56 w-full rounded-lg" />}>
+      <Suspense fallback={<LoginForm googleEnabled={googleEnabled} urlError={null} />}>
         <LoginFormWithUrlError searchParams={props.searchParams} />
       </Suspense>
     </AuthCard>

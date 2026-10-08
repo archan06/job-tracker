@@ -1,13 +1,29 @@
 "use client";
 
 import { GoogleLogo } from "@phosphor-icons/react";
+import { useState } from "react";
+import { ResendVerification } from "@/components/auth/resend-verification";
 import { useFormAction } from "@/components/forms/use-form-action";
 import { Button } from "@/components/ui/button";
-import { Field, FormAlert, Input } from "@/components/ui/field";
+import { Field, FormAlert, FormNotice, Input } from "@/components/ui/field";
+import { authErrorMessage } from "@/lib/auth-errors";
 import { googleSignInAction, loginAction } from "@/server/actions/auth";
 
-export function LoginForm({ googleEnabled, urlError, callbackUrl }: { googleEnabled: boolean; urlError: string | null; callbackUrl?: string }) {
+const UNVERIFIED = authErrorMessage("unverified");
+
+export function LoginForm({
+  googleEnabled,
+  urlError,
+  notice = null,
+  callbackUrl,
+}: {
+  googleEnabled: boolean;
+  urlError: string | null;
+  notice?: string | null;
+  callbackUrl?: string;
+}) {
   const { formProps, pending, blocked, error } = useFormAction(loginAction);
+  const [email, setEmail] = useState("");
   const message = error ?? urlError;
 
   return (
@@ -28,8 +44,16 @@ export function LoginForm({ googleEnabled, urlError, callbackUrl }: { googleEnab
           </div>
         </>
       )}
-      <form {...formProps} className="flex flex-col gap-4">
-        {message && <FormAlert>{message}</FormAlert>}
+      <form
+        {...formProps}
+        // Remembered for "Resend email"; read on submit so text typed before the page finished loading counts too.
+        onSubmit={(event) => {
+          setEmail(String(new FormData(event.currentTarget).get("email") ?? ""));
+          formProps.onSubmit(event);
+        }}
+        className="flex flex-col gap-4"
+      >
+        {message ? <FormAlert>{message}</FormAlert> : notice && <FormNotice>{notice}</FormNotice>}
         {callbackUrl && <input type="hidden" name="callbackUrl" value={callbackUrl} />}
         <Field id="email" label="Email">
           <Input id="email" name="email" type="email" autoComplete="email" required />
@@ -41,6 +65,7 @@ export function LoginForm({ googleEnabled, urlError, callbackUrl }: { googleEnab
           {pending ? "Signing in..." : "Sign in"}
         </Button>
       </form>
+      {error === UNVERIFIED && email && <ResendVerification email={email} />}
     </div>
   );
 }

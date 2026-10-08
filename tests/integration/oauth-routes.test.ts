@@ -19,10 +19,10 @@ beforeEach(async () => {
   await db.rateLimit.deleteMany();
 });
 
-const form = (path: string, fields: Record<string, string>) =>
+const form = (path: string, fields: Record<string, string>, ip = "203.0.113.1") =>
   new Request(`${ORIGIN}${path}`, {
     method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
+    headers: { "content-type": "application/x-www-form-urlencoded", "x-real-ip": ip },
     body: new URLSearchParams(fields),
   });
 
@@ -85,9 +85,19 @@ test("token endpoint errors use OAuth error codes", async () => {
   expect((await (await token(form("/oauth/token", { grant_type: "authorization_code" }))).json()).error).toBe("invalid_request");
 });
 
-test("token endpoint allows 60 requests a minute per client", async () => {
-  for (let i = 0; i < 60; i++) await token(form("/oauth/token", { grant_type: "refresh_token", refresh_token: "x", client_id: "c1" }));
-  expect((await token(form("/oauth/token", { grant_type: "refresh_token", refresh_token: "x", client_id: "c1" }))).status).toBe(429);
+test("token requests are limited per network and client, so spamming a public client_id can't lock others out", async () => {
+  const spam = { grant_type: "refresh_token", refresh_token: "x", client_id: "https://claude.ai/oauth/claude-client.json" };
+  for (let i = 0; i < 60; i++) await token(form("/oauth/token", spam, "198.51.100.66"));
+  expect((await token(form("/oauth/token", spam, "198.51.100.66"))).status).toBe(429);
+  const realUser = await token(form("/oauth/token", spam, "203.0.113.200"));
+  expect(realUser.status).toBe(400);
+  expect((await realUser.json()).error).toBe("invalid_grant");
+});
+
+test("an oversized client_id is rejected cleanly", async () => {
+  const res = await token(form("/oauth/token", { grant_type: "refresh_token", refresh_token: "x", client_id: "a".repeat(5000) }));
+  expect(res.status).toBe(400);
+  expect((await res.json()).error).toBe("invalid_request");
 });
 
 test("revoke always answers 200 and kills the token", async () => {

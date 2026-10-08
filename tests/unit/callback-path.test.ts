@@ -11,4 +11,9 @@ test.each([
   ["/\\evil.example", "/board"],
   ["javascript:alert(1)", "/board"],
   ["board", "/board"],
+  ["/\t/evil.example", "/board"],
+  ["/\n/evil.example", "/board"],
+  ["/\r/evil.example", "/board"],
+  ["/\t\\evil.example", "/board"],
+  ["/ok?next=//x", "/ok?next=//x"],
 ])("safeCallbackPath(%j) = %j", (raw, expected) => expect(safeCallbackPath(raw)).toBe(expected));

@@ -12,3 +12,6 @@ export function corsPreflight(): Response {
 export function noStoreJson(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store", ...CORS_HEADERS } });
 }
+
+/** Longest client_id accepted anywhere; CIMD URLs are short, and unbounded ids would bloat rate-limit keys. */
+export const MAX_CLIENT_ID_LENGTH = 2048;

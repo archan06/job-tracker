@@ -2,7 +2,7 @@
 
 import { Check, Copy } from "@phosphor-icons/react";
 import { useState, useTransition } from "react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { regenerateAddressAction } from "@/server/actions/inbound";
 
 export const GMAIL_FILTER_QUERY =
@@ -27,7 +27,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
-export function AddressCard({ address, forwardingCode }: { address: string; forwardingCode: string | null }) {
+export function AddressCard({ address, forwarding }: { address: string; forwarding: { code: string | null; link: string | null } | null }) {
   const [pending, start] = useTransition();
   return (
     <section className="rounded-xl border border-border bg-surface p-5 shadow-card sm:p-6">
@@ -42,12 +42,23 @@ export function AddressCard({ address, forwardingCode }: { address: string; forw
       <ol className="mt-5 flex list-decimal flex-col gap-3 pl-5 text-sm text-muted">
         <li>
           In Gmail, open <span className="font-medium text-text">Settings → Forwarding and POP/IMAP → Add a forwarding address</span> and paste the address above.
-          {forwardingCode ? (
+          {forwarding?.link ? (
+            <span className="mt-2 block">
+              <a
+                href={forwarding.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonClasses("primary", "sm")}
+              >
+                Confirm forwarding in Gmail
+              </a>
+            </span>
+          ) : forwarding?.code ? (
             <span className="mt-1 block text-text">
-              Gmail&apos;s confirmation code: <span className="font-mono font-semibold">{forwardingCode}</span>
+              Gmail&apos;s confirmation code: <span className="font-mono font-semibold">{forwarding.code}</span>
             </span>
           ) : (
-            <span className="mt-1 block">Gmail will send a confirmation code here; it will appear on this page.</span>
+            <span className="mt-1 block">Gmail will send a confirmation link here; it will appear on this page.</span>
           )}
         </li>
         <li>

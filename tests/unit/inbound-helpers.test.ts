@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { inboundAddress, newInboundToken, tokenFromRecipients } from "@/lib/inbound/address";
 import { isAtsDomain, normalizeCompany, senderDomain } from "@/lib/inbound/companies";
-import { gmailForwardingCode } from "@/lib/inbound/forwarding";
+import { gmailForwardingConfirmation } from "@/lib/inbound/forwarding";
 import { htmlToText, snippet } from "@/lib/inbound/text";
 
 const DOMAIN = "in.alexrchan.dev";
@@ -22,12 +22,48 @@ test("finds the token among recipients, case-insensitively, only on our domain",
   expect(tokenFromRecipients([], DOMAIN)).toBeNull();
 });
 
-test("Gmail forwarding confirmation code comes from the subject or body, only from Google", () => {
+test("Gmail forwarding confirmation: code from the subject or body, only from Google", () => {
   const subject = "(#123456789) Gmail Forwarding Confirmation - Receive Mail from alex@gmail.com";
-  expect(gmailForwardingCode("Gmail Team <forwarding-noreply@google.com>", subject, "")).toBe("123456789");
-  expect(gmailForwardingCode("forwarding-noreply@google.com", "Gmail Forwarding Confirmation", "Confirmation code: 987654321")).toBe("987654321");
-  expect(gmailForwardingCode("attacker@evil.example", subject, "")).toBeNull();
-  expect(gmailForwardingCode("forwarding-noreply@google.com", "Something else", "Confirmation code: 1")).toBeNull();
+  expect(gmailForwardingConfirmation("Gmail Team <forwarding-noreply@google.com>", subject, "")).toEqual({ code: "123456789", link: null });
+  expect(gmailForwardingConfirmation("forwarding-noreply@google.com", "Gmail Forwarding Confirmation", "Confirmation code: 987654321")).toEqual({ code: "987654321", link: null });
+  expect(gmailForwardingConfirmation("attacker@evil.example", subject, "")).toBeNull();
+  expect(gmailForwardingConfirmation("forwarding-noreply@google.com", "Something else", "Confirmation code: 1")).toBeNull();
+});
+
+const LINK_EMAIL = `alex@gmail.com has requested to automatically forward mail to your email
+address u-abc@in.example.
+
+To allow alex@gmail.com to automatically forward mail to your address,
+please click the link below to confirm the request:
+
+https://mail-settings.google.com/mail/vf-%5BANGjdJ-8nDRL_bj3%5D-2XOtyTfwME9miA-C99bX7oPSEyI
+
+If you click the link and it appears to be broken, please copy and paste it`;
+
+test("Gmail forwarding confirmation: the newer link-only email gives the confirmation link", () => {
+  const subject = "(Gmail Forwarding Confirmation - Receive Mail from alex@gmail.com";
+  expect(gmailForwardingConfirmation("forwarding-noreply@google.com", subject, LINK_EMAIL)).toEqual({
+    code: null,
+    link: "https://mail-settings.google.com/mail/vf-%5BANGjdJ-8nDRL_bj3%5D-2XOtyTfwME9miA-C99bX7oPSEyI",
+  });
+});
+
+test("Gmail forwarding confirmation: only https links on Google's settings host are kept", () => {
+  const subject = "Gmail Forwarding Confirmation";
+  const from = "forwarding-noreply@google.com";
+  for (const bad of [
+    "https://mail-settings.google.com.evil.example/mail/vf-abc",
+    "https://evil.example/mail-settings.google.com/mail/vf-abc",
+    "http://mail-settings.google.com/mail/vf-abc",
+    "https://user@evil.example/mail/vf-abc",
+    "https://mail-settings.google.com/other/path",
+  ]) {
+    expect(gmailForwardingConfirmation(from, subject, `click the link below:\n\n${bad}\n`)).toEqual({ code: null, link: null });
+  }
+});
+
+test("Gmail forwarding confirmation without a code or link is still recognized", () => {
+  expect(gmailForwardingConfirmation("forwarding-noreply@google.com", "Gmail Forwarding Confirmation", "no code here")).toEqual({ code: null, link: null });
 });
 
 test("company names normalize away case, punctuation and legal suffixes", () => {

@@ -255,6 +255,7 @@ model InboundEmail {
   receivedAt     DateTime
   snippet        String
   forwardingCode String?
+  forwardingLink String?
 
   kind          InboundEmailKind?
   confidence    Float?

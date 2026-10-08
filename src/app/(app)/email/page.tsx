@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { STATUS_LABELS } from "@/lib/status";
 import { requireUserId } from "@/server/auth";
 import { inboundDomain } from "@/server/inbound/deps";
-import { getOrCreateInboundAddress, inboxCounts, latestForwardingCode, listInbox } from "@/server/inbound/service";
+import { getOrCreateInboundAddress, inboxCounts, latestForwardingConfirmation, listInbox } from "@/server/inbound/service";
 import { listApplications } from "@/server/services/applications";
 
 export const metadata: Metadata = { title: "Email" };
@@ -63,9 +63,9 @@ export default async function EmailPage(props: PageProps<"/email">) {
   }
 
   const counts = TABS.map((t) => t.states.reduce((sum, s) => sum + stateCounts[s], 0));
-  const [address, forwardingCode, emails, applications] = await Promise.all([
+  const [address, forwarding, emails, applications] = await Promise.all([
     getOrCreateInboundAddress(userId, domain),
-    latestForwardingCode(userId),
+    latestForwardingConfirmation(userId),
     Promise.all(tab.states.map((s) => listInbox(userId, s))).then((lists) => lists.flat().sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())),
     tab.key === "review" ? listApplications(userId, {}, { pageSize: 200 }) : Promise.resolve([]),
   ]);
@@ -74,7 +74,7 @@ export default async function EmailPage(props: PageProps<"/email">) {
   return (
     <div className="mx-auto max-w-4xl">
       <PageHeader title="Email" description="Forward job emails to Landed and your board updates itself." />
-      <AddressCard address={address} forwardingCode={forwardingCode} />
+      <AddressCard address={address} forwarding={forwarding} />
 
       <section className="mt-6 rounded-xl border border-border bg-surface shadow-card">
         <div role="tablist" aria-label="Forwarded emails" className="flex gap-1 overflow-x-auto border-b border-border px-2 pt-2">

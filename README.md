@@ -143,6 +143,15 @@ Put the client ID and secret in `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`. The G
 
 Company suggestions and logos come from [Logo.dev](https://www.logo.dev) and city suggestions from [Geoapify](https://www.geoapify.com). Both have free plans. From your Logo.dev dashboard, copy the secret key (`sk_...`) into `LOGO_DEV_SECRET_KEY` and the publishable key (`pk_...`) into `NEXT_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY`. Create a Geoapify project and copy its API key into `GEOAPIFY_API_KEY`. All three are optional: without them the fields still work as plain text, past companies are still suggested, and every company shows an initials avatar.
 
+### Connecting Claude or ChatGPT
+
+Landed is an MCP server with its own OAuth 2.1 sign-in, so Claude and ChatGPT can read, add and update a user's applications (never delete). Each user connects with the address `https://<your-domain>/api/mcp`:
+
+- **Claude:** Settings → Connectors → Add custom connector.
+- **ChatGPT:** turn on Developer mode (paid plans), then add a connector.
+
+They sign in to Landed, review what the app can do, and click Allow. Connections can be removed anytime under the account menu → **Connected apps**. Supports Client ID Metadata Documents and Dynamic Client Registration, PKCE (S256), rotating refresh tokens and per-tool scopes (`applications:read`, `applications:write`).
+
 ## Testing
 
 | Command | What it runs |

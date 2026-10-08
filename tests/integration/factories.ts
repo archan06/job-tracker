@@ -5,7 +5,7 @@ import { createApplication } from "@/server/services/applications";
 let counter = 0;
 
 export function makeUser(email = `user-${++counter}-${Date.now()}@example.com`) {
-  return db.user.create({ data: { email, name: "Test User" } });
+  return db.user.create({ data: { email, name: "Test User", emailVerified: new Date() } });
 }
 
 export function makeApplication(userId: string, overrides: Partial<ApplicationInput> = {}) {

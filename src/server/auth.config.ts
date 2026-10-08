@@ -5,7 +5,7 @@ import { safeCallbackPath } from "@/lib/callback-path";
 /** Google sign-in is optional; the app works with email/password alone. */
 export const googleEnabled = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
 
-const PUBLIC_PATHS = ["/login", "/register"];
+const PUBLIC_PATHS = ["/login", "/register", "/check-email", "/verify-email"];
 /** Generated metadata routes with no file extension, so the proxy matcher doesn't skip them. */
 const PUBLIC_ASSETS = ["/apple-icon"];
 
@@ -21,7 +21,8 @@ export const authConfig = {
   providers: googleEnabled ? [Google] : [],
   callbacks: {
     authorized({ auth, request: { nextUrl, method } }) {
-      const signedIn = Boolean(auth?.user);
+      // The session only carries an id for verified accounts (see `session` below).
+      const signedIn = Boolean(auth?.user?.id);
       const { pathname } = nextUrl;
       if (pathname.startsWith("/api/auth")) return true;
       if (PUBLIC_ASSETS.includes(pathname)) return true;
@@ -41,11 +42,15 @@ export const authConfig = {
       return signedIn;
     },
     jwt({ token, user }) {
-      if (user?.id) token.sub = user.id;
+      if (user?.id) {
+        token.sub = user.id;
+        token.verified = "emailVerified" in user && Boolean(user.emailVerified);
+      }
       return token;
     },
+    // Sessions from before email verification have no `verified`, so they act signed out until the person signs in again.
     session({ session, token }) {
-      if (token.sub) session.user.id = token.sub;
+      if (token.sub && token.verified === true) session.user.id = token.sub;
       return session;
     },
   },

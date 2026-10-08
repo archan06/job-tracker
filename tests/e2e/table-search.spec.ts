@@ -1,15 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { useFreshNetwork } from "./helpers";
+import { signUpAndVerify, useFreshNetwork } from "./helpers";
 
 test.beforeEach(async ({ page }) => useFreshNetwork(page));
 
 test("company search with a trailing space settles instead of re-querying", async ({ page }) => {
-  await page.goto("/register");
-  await page.getByLabel("Name").fill("Search Test");
-  await page.getByLabel("Email").fill(`search-${Date.now()}-${test.info().project.name}@example.com`);
-  await page.getByLabel("Password").fill("search-password-1");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page).toHaveURL(/\/board/);
+  await signUpAndVerify(page, { name: "Search Test", email: `search-${Date.now()}-${test.info().project.name}@example.com`, password: "search-password-1" });
   await page.goto("/applications/new");
   await page.getByLabel("Company", { exact: true }).fill("Playwright Inc");
   await page.getByLabel("Job title").fill("QA Engineer");

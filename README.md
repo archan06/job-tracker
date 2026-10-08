@@ -152,6 +152,12 @@ Landed is an MCP server with its own OAuth 2.1 sign-in, so Claude and ChatGPT ca
 
 They sign in to Landed, review what the app can do, and click Allow. Connections can be removed anytime under the account menu → **Connected apps**. Supports Client ID Metadata Documents and Dynamic Client Registration, PKCE (S256), rotating refresh tokens and per-tool scopes (`applications:read`, `applications:write`).
 
+### Email verification
+
+New accounts confirm their address before they can sign in: sign-up emails a link (valid 24 hours) and shows a **Check your inbox** page with a resend button. Google sign-ins count as verified. Unverified accounts are deleted after 7 days, and an unverified address can be signed up again by its real owner.
+
+Setup: verify a sending domain in [Resend](https://resend.com), then set `RESEND_API_KEY`, `EMAIL_FROM` (e.g. `Landed <noreply@in.example.com>`) and `APP_URL` (the site's public URL, used in links). Without Resend, development prints the link to the server console; production refuses sign-ups until it's configured.
+
 ### Forwarded job emails
 
 Users forward job emails to a private Landed address, and Landed updates their board: application confirmations add or advance an application, and interviews, rejections and offers move it. Every change is logged on the timeline and can be undone from the **Email** page; anything Landed isn't sure about waits there for review.
@@ -178,7 +184,7 @@ Integration and end-to-end tests refuse to run if `TEST_DATABASE_URL` is missing
 ## Deploying to Vercel
 
 1. Import the repository into Vercel.
-2. Add `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, the suggestion keys (`LOGO_DEV_SECRET_KEY`, `NEXT_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY`, `GEOAPIFY_API_KEY`), the email keys (`RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `INBOUND_EMAIL_DOMAIN`, `ANTHROPIC_API_KEY`) and, if you use Google sign-in, `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`.
+2. Add `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, the suggestion keys (`LOGO_DEV_SECRET_KEY`, `NEXT_PUBLIC_LOGO_DEV_PUBLISHABLE_KEY`, `GEOAPIFY_API_KEY`), the email keys (`RESEND_API_KEY`, `EMAIL_FROM`, `APP_URL`, `RESEND_WEBHOOK_SECRET`, `INBOUND_EMAIL_DOMAIN`, `ANTHROPIC_API_KEY`) and, if you use Google sign-in, `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`.
 3. Set the build command to apply migrations before building:
    ```bash
    npx prisma migrate deploy && npm run build

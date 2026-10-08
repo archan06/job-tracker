@@ -47,6 +47,8 @@ model User {
   accounts     Account[]
   sessions     Session[]
   applications Application[]
+  oauthCodes   OAuthCode[]
+  oauthGrants  OAuthGrant[]
 }
 
 model Application {
@@ -150,4 +152,65 @@ model RateLimit {
   key     String   @id
   count   Int
   resetAt DateTime
+}
+
+enum OAuthClientKind {
+  /// Registered itself through POST /oauth/register.
+  DCR
+  /// Identified by a URL serving its metadata (Client ID Metadata Document).
+  CIMD
+}
+
+/// An app that can ask users to connect it (Claude, ChatGPT, ...).
+model OAuthClient {
+  /// The client_id: random for DCR, the metadata URL for CIMD.
+  id           String          @id
+  name         String
+  redirectUris String[]
+  kind         OAuthClientKind
+  createdAt    DateTime        @default(now())
+  /// When CIMD metadata was last fetched.
+  refreshedAt  DateTime        @default(now())
+
+  codes  OAuthCode[]
+  grants OAuthGrant[]
+}
+
+/// A one-time authorization code, valid for 60 seconds.
+model OAuthCode {
+  codeHash      String    @id
+  clientId      String
+  userId        String
+  redirectUri   String
+  codeChallenge String
+  scopes        String[]
+  resource      String
+  expiresAt     DateTime
+  usedAt        DateTime?
+
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// One connection between a user and an app. Tokens are stored only as SHA-256 hashes.
+model OAuthGrant {
+  id                   String    @id @default(cuid())
+  userId               String
+  clientId             String
+  scopes               String[]
+  resource             String
+  accessTokenHash      String?   @unique
+  accessExpiresAt      DateTime?
+  refreshTokenHash     String?   @unique
+  refreshExpiresAt     DateTime?
+  /// Refresh tokens already rotated out. Presenting one means it leaked, so the grant is revoked.
+  retiredRefreshHashes String[]
+  createdAt            DateTime  @default(now())
+  lastUsedAt           DateTime?
+  revokedAt            DateTime?
+
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientId])
 }

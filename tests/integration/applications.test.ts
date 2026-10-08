@@ -162,7 +162,9 @@ describe("calendar dates for status changes", () => {
     const updated = await changeStatus(u.id, a.id, "APPLIED", { today });
     expect(toDateInputValue(updated.dateApplied!)).toBe("2026-10-07");
     const { events } = await getApplication(u.id, a.id);
-    expect(events[0].date.toISOString()).toBe("2026-10-07T00:00:00.000Z");
+    // Find the change itself: the creation event is dated by the real clock, which can sort above it.
+    const applied = events.find((e) => e.type === "STATUS_CHANGE" && e.toStatus === "APPLIED")!;
+    expect(applied.date.toISOString()).toBe("2026-10-07T00:00:00.000Z");
   });
 
   test("create as Applied with a blank date uses the viewer's day", async () => {

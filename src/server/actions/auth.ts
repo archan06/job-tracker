@@ -16,14 +16,17 @@ import { rateLimit } from "@/server/services/rate-limit";
 import { registerUser } from "@/server/services/users";
 import type { ActionResult } from "./types";
 
-async function signInWithPassword(email: string, password: string, redirectTo = "/board"): Promise<ActionResult> {
+/** Credentials error codes the login form explains; anything else shows as a wrong email or password. */
+const PASSED_THROUGH = new Set(["rate_limited", "unverified", "unverified_unsent"]);
+
+async function signInWithPassword(email: string, password: string, redirectTo = "/board", token?: string): Promise<ActionResult> {
   try {
-    await signIn("credentials", { email, password, redirectTo });
+    await signIn("credentials", { email, password, redirectTo, ...(token ? { token } : {}) });
     return { ok: true };
   } catch (error) {
     // signIn redirects by throwing; only Auth.js errors are failures.
     if (error instanceof AuthError) {
-      const code = error instanceof CredentialsSignin && (error.code === "rate_limited" || error.code === "unverified") ? error.code : error.type;
+      const code = error instanceof CredentialsSignin && PASSED_THROUGH.has(error.code) ? error.code : error.type;
       return { ok: false, error: authErrorMessage(code) ?? undefined };
     }
     throw error;
@@ -49,6 +52,15 @@ export async function registerAction(_prev: ActionResult, formData: FormData): P
   }
   const sent = await sendVerification(user.id, ip, sender);
   redirect(`/check-email?email=${encodeURIComponent(user.email)}${sent === "sent" ? "" : "&limited=1"}`);
+}
+
+/** "Verify and sign in": the emailed link's token plus the account's password. */
+export async function verifyAndSignInAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const email = String(formData.get("email") ?? "");
+  const password = String(formData.get("password") ?? "");
+  const token = String(formData.get("token") ?? "");
+  if (!email || !password || !token) return { ok: false, error: "Enter your password." };
+  return signInWithPassword(email, password, "/board", token);
 }
 
 /** "Resend email" and "Send a new link". Answers the same whatever the address, so it reveals nothing. */

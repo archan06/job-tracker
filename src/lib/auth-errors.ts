@@ -1,6 +1,7 @@
 const MESSAGES: Record<string, string> = {
   CredentialsSignin: "Email or password is incorrect.",
   unverified: "Verify your email first. We've sent you a new link.",
+  unverified_unsent: "Verify your email first. We couldn't send a new link right now, so try again later.",
   rate_limited: "Too many sign-in attempts. Wait 15 minutes and try again.",
   OAuthAccountNotLinked: "This email is already registered with a password. Sign in with your password instead.",
 };

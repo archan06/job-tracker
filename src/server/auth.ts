@@ -6,7 +6,7 @@ import { loginSchema } from "@/lib/validation/auth";
 import { db } from "@/server/db";
 import { clientIp } from "@/server/client-ip";
 import { emailSender } from "@/server/mail/sender";
-import { sendVerification } from "@/server/services/email-verification";
+import { sendVerification, verifyEmailToken } from "@/server/services/email-verification";
 import { rateLimit } from "@/server/services/rate-limit";
 import { verifyCredentials } from "@/server/services/users";
 import { authConfig } from "./auth.config";
@@ -17,9 +17,12 @@ class TooManyAttempts extends CredentialsSignin {
   code = "rate_limited";
 }
 
-/** Right password, but the address hasn't been confirmed. A fresh link has been sent. */
+/** Right password, but the address hasn't been confirmed. `unverified` when a fresh link went out, `unverified_unsent` when none could. */
 class Unverified extends CredentialsSignin {
-  code = "unverified";
+  constructor(sent: boolean) {
+    super();
+    this.code = sent ? "unverified" : "unverified_unsent";
+  }
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -48,7 +51,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     ...authConfig.providers,
     Credentials({
-      credentials: { email: {}, password: {} },
+      // `token`: the emailed verification link's token, sent by the "Verify and sign in" page.
+      credentials: { email: {}, password: {}, token: {} },
       // Every password check, from the login form or a direct POST to Auth.js, passes through here.
       async authorize(raw, request) {
         const parsed = loginSchema.safeParse(raw);
@@ -59,11 +63,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         ]);
         if (!perAccount.ok || !perNetwork.ok) throw new TooManyAttempts();
         const user = await verifyCredentials(parsed.data.email, parsed.data.password);
-        if (user && !user.emailVerified) {
-          await sendVerification(user.id, clientIp(request.headers), emailSender());
-          throw new Unverified();
-        }
-        return user;
+        if (!user || user.emailVerified) return user;
+        // Verifying takes both the link (the inbox) and the password, so whoever set the password can't verify someone else's inbox.
+        const token = typeof raw.token === "string" ? raw.token : "";
+        if (token && (await verifyEmailToken(token, user.id))) return { ...user, emailVerified: new Date() };
+        const sent = await sendVerification(user.id, clientIp(request.headers), emailSender());
+        throw new Unverified(sent === "sent");
       },
     }),
   ],

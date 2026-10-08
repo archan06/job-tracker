@@ -24,7 +24,7 @@ async function signIn(page: Page, email: string) {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 }
 
-test("sign up → check inbox → open link → sign in", async ({ page }) => {
+test("sign up → check inbox → open link → verify with password", async ({ page }) => {
   const email = address();
   await signUp(page, email);
   await expect(page).toHaveURL(/\/check-email/);
@@ -32,10 +32,24 @@ test("sign up → check inbox → open link → sign in", async ({ page }) => {
   await expect(page.getByText(email)).toBeVisible();
 
   await page.goto(await latestLinkFor(email));
-  await expect(page).toHaveURL(/\/login\?verified=1/);
-  await expect(page.getByText("Email verified. Sign in to continue.")).toBeVisible();
-  await signIn(page, email);
+  await expect(page.getByRole("heading", { name: "Verify and sign in" })).toBeVisible();
+  await expect(page.getByText(email)).toBeVisible();
+  await page.getByLabel("Password").fill("not-my-password");
+  await page.getByRole("button", { name: "Verify and sign in" }).click();
+  await expect(page.getByText("Email or password is incorrect.")).toBeVisible();
+  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Verify and sign in" }).click();
   await expect(page).toHaveURL(/\/board/);
+});
+
+test("opening the link alone doesn't verify the account", async ({ page }) => {
+  const email = address();
+  await signUp(page, email);
+  await page.goto(await latestLinkFor(email));
+  await expect(page.getByRole("heading", { name: "Verify and sign in" })).toBeVisible();
+  await page.goto("/login");
+  await signIn(page, email);
+  await expect(page.getByText(/Verify your email first/)).toBeVisible();
 });
 
 test("an unverified sign-in shows the resend screen", async ({ page }) => {

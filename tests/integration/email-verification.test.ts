@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import { beforeEach, expect, test } from "vitest";
 import { db } from "@/server/db";
 import { fakeSender, type EmailSender } from "@/server/mail/sender";
-import { cleanupUnverified, requestNewLink, sendVerification, verifyEmailToken } from "@/server/services/email-verification";
+import { cleanupUnverified, findVerificationEmail, requestNewLink, sendVerification, verifyEmailToken } from "@/server/services/email-verification";
 import { EmailTakenError } from "@/server/services/errors";
 import { registerUser, verifyCredentials } from "@/server/services/users";
 
@@ -65,8 +65,8 @@ test("the same link verifies, and verifies again", async () => {
   const user = await signUp();
   await sendVerification(user.id, ip(), sender, t0);
   const token = tokenIn(sent()[0].text);
-  expect(await verifyEmailToken(token, at(60_000))).toBe(true);
-  expect(await verifyEmailToken(token, at(120_000))).toBe(true);
+  expect(await verifyEmailToken(token, user.id, at(60_000))).toBe(true);
+  expect(await verifyEmailToken(token, user.id, at(120_000))).toBe(true);
   const row = await db.user.findUniqueOrThrow({ where: { id: user.id } });
   expect(row.emailVerified).toEqual(at(60_000));
   expect(row.unverifiedExpiresAt).toBeNull();
@@ -75,12 +75,13 @@ test("the same link verifies, and verifies again", async () => {
 test("an expired link is refused", async () => {
   const user = await signUp();
   await sendVerification(user.id, ip(), sender, t0);
-  expect(await verifyEmailToken(tokenIn(sent()[0].text), at(DAY + 1))).toBe(false);
+  expect(await verifyEmailToken(tokenIn(sent()[0].text), user.id, at(DAY + 1))).toBe(false);
   expect((await db.user.findUniqueOrThrow({ where: { id: user.id } })).emailVerified).toBeNull();
 });
 
 test("an unknown token is refused", async () => {
-  expect(await verifyEmailToken("not-a-real-token", t0)).toBe(false);
+  const user = await signUp();
+  expect(await verifyEmailToken("not-a-real-token", user.id, t0)).toBe(false);
 });
 
 test("a 4th send in an hour for one account is limited", async () => {
@@ -122,7 +123,7 @@ test("sign-up never replaces a verified account", async () => {
   const address = email();
   const user = await signUp(address, "first-password-1");
   await sendVerification(user.id, ip(), sender, t0);
-  await verifyEmailToken(tokenIn(sent()[0].text), t0);
+  await verifyEmailToken(tokenIn(sent()[0].text), user.id, t0);
   await expect(signUp(address, "second-password-2")).rejects.toBeInstanceOf(EmailTakenError);
   expect(await verifyCredentials(address, "first-password-1")).not.toBeNull();
 });
@@ -157,4 +158,42 @@ test("requestNewLink sends nothing for unknown, verified or Google-only users", 
   const legacy = await legacyUser();
   await requestNewLink(legacy.email.toUpperCase(), ip(), sender, t0);
   expect(sent().map((m) => m.to)).toEqual([legacy.email]);
+});
+
+test("a link only verifies the account it was sent for", async () => {
+  const owner = await signUp();
+  const other = await signUp();
+  await sendVerification(owner.id, ip(), sender, t0);
+  const token = tokenIn(sent()[0].text);
+  expect(await verifyEmailToken(token, other.id, t0)).toBe(false);
+  expect((await db.user.findUniqueOrThrow({ where: { id: other.id } })).emailVerified).toBeNull();
+  expect(await verifyEmailToken(token, owner.id, t0)).toBe(true);
+});
+
+test("findVerificationEmail names the account for a live link, and nothing for a dead one", async () => {
+  const user = await signUp();
+  await sendVerification(user.id, ip(), sender, t0);
+  const token = tokenIn(sent()[0].text);
+  expect(await findVerificationEmail(token, t0)).toBe(user.email);
+  expect(await findVerificationEmail(token, at(DAY + 1))).toBeNull();
+  expect(await findVerificationEmail("nope", t0)).toBeNull();
+});
+
+test("after a stranger takes over an unverified address, the owner's old link is dead and signing up again gives it back", async () => {
+  const address = email();
+  const ann = await signUp(address, "ann-password-1");
+  await sendVerification(ann.id, ip(), sender, t0);
+  const annLink = tokenIn(sent()[0].text);
+  await signUp(address, "eve-password-1", at(60_000));
+  expect(await findVerificationEmail(annLink, at(60_000))).toBeNull();
+  // Ann signs up again: the account is hers again, and only her password works.
+  await signUp(address, "ann-password-2", at(120_000));
+  expect(await verifyCredentials(address, "ann-password-2")).not.toBeNull();
+  expect(await verifyCredentials(address, "eve-password-1")).toBeNull();
+});
+
+test("a send that fails is reported, not thrown", async () => {
+  const user = await signUp();
+  const broken: EmailSender = { send: async () => { throw new Error("domain not verified"); } };
+  expect(await sendVerification(user.id, ip(), broken, t0)).toBe("failed");
 });

@@ -16,14 +16,15 @@ Sign-up accepts any well-formed address, including ones nobody owns (`test@test.
 ### Signing up
 1. The form is unchanged. Submitting creates the account **unverified** and emails a link.
 2. The person lands on **"Check your inbox"** (`/check-email`), which shows the address and a **Resend email** button (disabled for 60 seconds after each click). They are not signed in.
-3. The link (`/verify-email?token=…`) verifies the account and sends them to `/login?verified=1`, which shows "Email verified. Sign in to continue." Links expire after 24 hours.
+3. The link (`/verify-email?token=…`) opens **"Verify and sign in"**: the person enters their password, and the account is verified and signed in only when the link belongs to that account **and** the password matches. Opening the link alone changes nothing. Links expire after 24 hours.
+   - *Changed after review:* originally the link verified on its own. Then a stranger who signed up with your address (setting their password) would own the verified account once you clicked. Requiring the password as well means only someone with both the inbox and the password can verify.
 
 ### Signing in while unverified
 - Correct password, unverified account: sign-in is refused, a fresh link is sent (subject to rate limits), and the login form shows "Verify your email first" with a **Resend email** button.
 - Wrong password: the normal error. No email is sent, so the login form can't be used to send email to someone else's address.
 
 ### Expired, unknown or reused links
-- A link stays valid until it expires, even after it has verified the account; opening it again shows "Email verified" again. Email security scanners often open links before the person does, so single-use links would show people an "already used" error.
+- A link stays valid until it expires. Email security scanners often open links before the person does; since opening a link changes nothing, that's harmless.
 - Expired or unknown links show "This link has expired" with an email field to request a new one. That form always answers "If that account needs verifying, we've sent a new link", so it reveals nothing about which addresses have accounts.
 
 ### Someone signs up with your address and never verifies
@@ -57,7 +58,8 @@ Sign-up accepts any well-formed address, including ones nobody owns (`test@test.
 - Rate limits on sending: 3 per account per hour, 10 per network per hour. A blocked send still shows the "Check your inbox" screen, with a message to try again later.
 
 ### Enforcement
-- **Credentials sign-in** (`authorize`): after the password checks out, an unverified user gets a link sent and the sign-in is refused with the code `unverified`.
+- **Credentials sign-in** (`authorize`): after the password checks out, an unverified user is verified if the request carries a live token for that account (from "Verify and sign in"); otherwise a link is sent and the sign-in is refused with `unverified` (or `unverified_unsent` when no link could be sent).
+- A failed send never throws: `sendVerification` returns `"failed"`, so an email outage can't break sign-up or sign-in.
 - **Session:** the `jwt` callback records `verified: true` at sign-in (credentials users only get there verified; Google users are verified at creation). The proxy's `authorized` callback, `requireUserId()`, the `/api/suggest/*` routes and the OAuth authorize page treat a session without `verified` as signed out.
 - **Google:** in Auth.js's `createUser` / `linkAccount` events, set `emailVerified` when the Google profile has `email_verified`.
 - **Claude connector:** MCP bearer-token checks reject tokens belonging to users without `emailVerified`.

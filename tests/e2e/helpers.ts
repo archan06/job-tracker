@@ -33,7 +33,7 @@ export function emailsTo(email: string): number {
   }
 }
 
-/** Signs up, opens the emailed link, signs in, and lands on the board. */
+/** Signs up, opens the emailed link, confirms with the password, and lands on the board. */
 export async function signUpAndVerify(page: Page, { name, email, password }: { name: string; email: string; password: string }) {
   await page.goto("/register");
   await page.getByLabel("Name").fill(name);
@@ -42,11 +42,9 @@ export async function signUpAndVerify(page: Page, { name, email, password }: { n
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page).toHaveURL(/\/check-email/);
   await page.goto(await latestLinkFor(email));
-  await expect(page).toHaveURL(/\/login\?verified=1/);
-  // The notice only shows once the real form has streamed in; text typed into the placeholder before that is lost.
-  await expect(page.getByText("Email verified. Sign in to continue.")).toBeVisible();
-  await page.getByLabel("Email").fill(email);
+  await expect(page.getByRole("heading", { name: "Verify and sign in" })).toBeVisible();
+  await page.waitForLoadState("networkidle");
   await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: "Verify and sign in" }).click();
   await expect(page).toHaveURL(/\/board/);
 }

@@ -17,6 +17,8 @@ async function signUp(page: Page, email: string) {
 }
 
 async function signIn(page: Page, email: string) {
+  // Text typed into /login before the real form streams in can be lost (a known issue), so let it load first.
+  await page.waitForLoadState("networkidle");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

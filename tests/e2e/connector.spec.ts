@@ -1,17 +1,12 @@
 import { createHash, randomBytes } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
-import { useFreshNetwork } from "./helpers";
+import { signUpAndVerify, useFreshNetwork } from "./helpers";
 
 const REDIRECT = "https://client.example/callback";
 
 async function registerUser(page: Page) {
   const email = `e2e-mcp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${test.info().project.name}@example.com`;
-  await page.goto("/register");
-  await page.getByLabel("Name").fill("E2E");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill("e2e-password-123");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page).toHaveURL(/\/board/);
+  await signUpAndVerify(page, { name: "E2E", email, password: "e2e-password-123" });
   return email;
 }
 

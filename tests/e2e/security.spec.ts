@@ -39,7 +39,7 @@ test("too many sign-ups from one network are refused", async ({ page }) => {
   };
   for (let n = 0; n < 5; n++) {
     await register(n);
-    await expect(page).toHaveURL(/\/board/);
+    await expect(page).toHaveURL(/\/check-email/);
     await page.context().clearCookies();
   }
   await register(5);

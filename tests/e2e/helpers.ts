@@ -43,6 +43,8 @@ export async function signUpAndVerify(page: Page, { name, email, password }: { n
   await expect(page).toHaveURL(/\/check-email/);
   await page.goto(await latestLinkFor(email));
   await expect(page).toHaveURL(/\/login\?verified=1/);
+  // The notice only shows once the real form has streamed in; text typed into the placeholder before that is lost.
+  await expect(page.getByText("Email verified. Sign in to continue.")).toBeVisible();
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

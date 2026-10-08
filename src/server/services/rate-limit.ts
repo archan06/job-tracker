@@ -42,3 +42,11 @@ export async function spendProviderBudget(provider: keyof typeof PROVIDER_DAILY_
   const { ok } = await rateLimit(`provider:${provider}:day`, PROVIDER_DAILY_BUDGET[provider], 24 * 60 * 60_000, now);
   if (!ok) throw new RateLimitedError(`Daily ${provider} budget used up`);
 }
+
+/** Reads from Claude, ChatGPT and other connected apps, per account per minute. Writes share WRITES_PER_MINUTE. */
+export const MCP_READS_PER_MINUTE = 120;
+
+export async function enforceMcpReadLimit(userId: string, now = new Date()): Promise<void> {
+  const { ok } = await rateLimit(`mcp:${userId}`, MCP_READS_PER_MINUTE, 60_000, now);
+  if (!ok) throw new RateLimitedError("Too many requests from connected apps. Wait a minute and try again.");
+}

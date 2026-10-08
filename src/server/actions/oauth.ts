@@ -1,10 +1,11 @@
 "use server";
 
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUserId } from "@/server/auth";
 import { clientRedirect, validateAuthorizeRequest } from "@/server/oauth/authorize";
-import { createAuthorizationCode } from "@/server/oauth/grants";
+import { createAuthorizationCode, disconnectGrant } from "@/server/oauth/grants";
 import { originFromHeaders } from "@/server/oauth/urls";
 
 /**
@@ -26,4 +27,11 @@ export async function decideConsentAction(formData: FormData): Promise<void> {
   }
   const code = await createAuthorizationCode({ clientId: client.id, userId, redirectUri, codeChallenge, scopes, resource });
   redirect(clientRedirect(redirectUri, origin, state, { code }).toString());
+}
+
+/** Disconnects one of the signed-in user's connected apps; its tokens stop working immediately. */
+export async function disconnectAppAction(grantId: string): Promise<void> {
+  const userId = await requireUserId();
+  await disconnectGrant(userId, grantId);
+  revalidatePath("/settings/connections");
 }

@@ -16,7 +16,12 @@ async function registerUser(page: Page) {
 }
 
 async function authorizeUrl(page: Page) {
-  const reg = await page.request.post("/oauth/register", { data: { client_name: "Test Assistant", redirect_uris: [REDIRECT] } });
+  // API calls don't carry the page's fake network header, so give registration its own (it's limited per network).
+  const ip = `198.51.${Math.floor(Math.random() * 250) + 1}.${Math.floor(Math.random() * 250) + 1}`;
+  const reg = await page.request.post("/oauth/register", {
+    headers: { "x-forwarded-for": ip },
+    data: { client_name: "Test Assistant", redirect_uris: [REDIRECT] },
+  });
   expect(reg.status()).toBe(201);
   const { client_id } = await reg.json();
   const verifier = randomBytes(32).toString("base64url");
@@ -34,9 +39,12 @@ test.beforeEach(async ({ page }) => {
   await page.route("https://client.example/**", (route) => route.fulfill({ status: 200, body: "client callback" }));
 });
 
-test("signed out: sign in, see consent, Allow, and land back on the app with a code", async ({ page }) => {
-  const email = await registerUser(page);
-  await page.context().clearCookies();
+test("signed out: sign in, see consent, Allow, and land back on the app with a code", async ({ page: setupPage, browser }) => {
+  const email = await registerUser(setupPage);
+  // A fresh context is truly signed out; clearing cookies can race a response that sets them again.
+  const page = await (await browser.newContext()).newPage();
+  await useFreshNetwork(page);
+  await page.route("https://client.example/**", (route) => route.fulfill({ status: 200, body: "client callback" }));
   const { url, client_id, verifier } = await authorizeUrl(page);
   await page.goto(url);
   await expect(page).toHaveURL(/\/login\?callbackUrl=/);
@@ -80,4 +88,32 @@ test("an unregistered redirect address shows an error and never leaves Landed", 
   await page.goto(url.replace(encodeURIComponent(REDIRECT), encodeURIComponent("https://evil.example/cb")));
   await expect(page.getByText(/didn't register/)).toBeVisible();
   expect(new URL(page.url()).host).not.toContain("evil.example");
+});
+
+test("Connected apps lists the app; Disconnect removes it and its token stops working", async ({ page }) => {
+  await registerUser(page);
+  const { url, client_id, verifier } = await authorizeUrl(page);
+  await page.goto(url);
+  await page.getByRole("button", { name: "Allow" }).click();
+  await page.waitForURL(/^https:\/\/client\.example\/callback/);
+  const code = new URL(page.url()).searchParams.get("code")!;
+  const { access_token } = await (await page.request.post("/oauth/token", {
+    form: { grant_type: "authorization_code", code, client_id, redirect_uri: REDIRECT, code_verifier: verifier },
+  })).json();
+  const mcp = () => page.request.post("/api/mcp", {
+    headers: { authorization: `Bearer ${access_token}`, accept: "application/json, text/event-stream", "mcp-protocol-version": "2025-06-18" },
+    data: { jsonrpc: "2.0", id: 1, method: "tools/list" },
+  });
+  expect((await mcp()).status()).toBe(200);
+
+  await page.goto("/board");
+  await page.getByRole("button", { name: "Account" }).click();
+  await page.getByRole("menuitem", { name: "Connected apps" }).click();
+  await expect(page).toHaveURL(/\/settings\/connections$/);
+  await expect(page.getByText("Test Assistant")).toBeVisible();
+  await expect(page.getByText(/\/api\/mcp/)).toBeVisible();
+  await page.getByRole("button", { name: "Disconnect Test Assistant" }).click();
+  await expect(page.getByText("Test Assistant")).toBeHidden();
+  await expect(page.getByText(/No apps connected/)).toBeVisible();
+  expect((await mcp()).status()).toBe(401);
 });

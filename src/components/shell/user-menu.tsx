@@ -1,6 +1,7 @@
 "use client";
 
-import { SignOut } from "@phosphor-icons/react";
+import { PlugsConnected, SignOut } from "@phosphor-icons/react";
+import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { signOutAction } from "@/server/actions/auth";
 
@@ -54,6 +55,15 @@ export function UserMenu({ name, email }: { name: string | null; email: string }
             <p className="truncate text-sm text-muted">{email}</p>
           </div>
           <div className="my-1 h-px bg-border" />
+          <Link
+            href="/settings/connections"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-text transition hover:bg-surface-hover"
+          >
+            <PlugsConnected size={16} className="text-muted" />
+            Connected apps
+          </Link>
           <form action={signOutAction}>
             <button
               type="submit"

@@ -11,8 +11,9 @@ test("registers with lowercase email and hashed password", async () => {
   expect(row.passwordHash).not.toBe("correct-horse");
 });
 
-test("duplicate email throws EmailTakenError", async () => {
-  await registerUser({ email: "foo@example.com", name: "Foo", password: "correct-horse" });
+test("duplicate email of a verified account throws EmailTakenError", async () => {
+  const u = await registerUser({ email: "foo@example.com", name: "Foo", password: "correct-horse" });
+  await db.user.update({ where: { id: u.id }, data: { emailVerified: new Date(), unverifiedExpiresAt: null } });
   await expect(
     registerUser({ email: "foo@example.com", name: "X", password: "another-pass" }),
   ).rejects.toBeInstanceOf(EmailTakenError);

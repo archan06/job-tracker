@@ -7,6 +7,10 @@ export const ACCESS_TTL_MS = 60 * 60_000;
 export const REFRESH_TTL_MS = 30 * 24 * 60 * 60_000;
 /** How many rotated-out refresh tokens to remember for reuse detection. */
 const RETIRED_KEPT = 20;
+/** A client retrying (or racing) a refresh this soon after rotation isn't treated as token theft. */
+const REFRESH_RETRY_GRACE_MS = 60_000;
+/** Used or expired codes are deleted after this long. */
+const CODE_RETENTION_MS = 60 * 60_000;
 
 export type TokenResponse = {
   access_token: string;
@@ -28,6 +32,7 @@ type CodeInput = {
 /** A one-time authorization code for the consent the user just gave. Returns the raw code; only its hash is stored. */
 export async function createAuthorizationCode(input: CodeInput, now = new Date()): Promise<string> {
   const code = randomToken();
+  await db.oAuthCode.deleteMany({ where: { expiresAt: { lt: new Date(now.getTime() - CODE_RETENTION_MS) } } });
   await db.oAuthCode.create({
     data: { ...input, codeHash: hashToken(code), expiresAt: new Date(now.getTime() + CODE_TTL_MS) },
   });
@@ -71,7 +76,7 @@ export async function exchangeCode(
   if (!code) throw invalidGrant("Unknown authorization code");
   if (code.usedAt) {
     // A replayed code may have been intercepted: revoke what it issued (RFC 6749 §4.1.2).
-    await db.oAuthGrant.updateMany({ where: { userId: code.userId, clientId: code.clientId }, data: REVOKED(now) });
+    await db.oAuthGrant.updateMany({ where: { codeHash }, data: REVOKED(now) });
     throw invalidGrant("Authorization code already used");
   }
   if (code.expiresAt <= now) throw invalidGrant("Authorization code expired");
@@ -84,12 +89,10 @@ export async function exchangeCode(
   const { count } = await db.oAuthCode.updateMany({ where: { codeHash, usedAt: null }, data: { usedAt: now } });
   if (count !== 1) throw invalidGrant("Authorization code already used");
 
+  // Each code exchange is its own connection, so a second install doesn't disconnect the first.
   const { accessToken, refreshToken, data } = issueTokens(now);
-  const fields = { ...data, scopes: code.scopes, resource: code.resource, retiredRefreshHashes: [], revokedAt: null };
-  await db.oAuthGrant.upsert({
-    where: { userId_clientId: { userId: code.userId, clientId: code.clientId } },
-    create: { userId: code.userId, clientId: code.clientId, createdAt: now, ...fields },
-    update: fields,
+  await db.oAuthGrant.create({
+    data: { ...data, userId: code.userId, clientId: code.clientId, scopes: code.scopes, resource: code.resource, codeHash, createdAt: now },
   });
   return tokenResponse(accessToken, refreshToken, code.scopes);
 }
@@ -103,7 +106,9 @@ export async function refreshGrant(
   const grant = await db.oAuthGrant.findUnique({ where: { refreshTokenHash: oldHash } });
   if (!grant) {
     const leaked = await db.oAuthGrant.findFirst({ where: { retiredRefreshHashes: { has: oldHash } } });
-    if (leaked) await db.oAuthGrant.update({ where: { id: leaked.id }, data: REVOKED(now) });
+    const justRotated =
+      leaked?.retiredRefreshHashes[0] === oldHash && leaked.rotatedAt && now.getTime() - leaked.rotatedAt.getTime() < REFRESH_RETRY_GRACE_MS;
+    if (leaked && !justRotated) await db.oAuthGrant.update({ where: { id: leaked.id }, data: REVOKED(now) });
     throw invalidGrant("Unknown or already-used refresh token");
   }
   if (grant.revokedAt || !grant.refreshExpiresAt || grant.refreshExpiresAt <= now) throw invalidGrant("Refresh token expired or revoked");
@@ -113,7 +118,7 @@ export async function refreshGrant(
   const { accessToken, refreshToken, data } = issueTokens(now);
   const { count } = await db.oAuthGrant.updateMany({
     where: { id: grant.id, refreshTokenHash: oldHash },
-    data: { ...data, retiredRefreshHashes: [oldHash, ...grant.retiredRefreshHashes].slice(0, RETIRED_KEPT) },
+    data: { ...data, rotatedAt: now, retiredRefreshHashes: [oldHash, ...grant.retiredRefreshHashes].slice(0, RETIRED_KEPT) },
   });
   if (count !== 1) throw invalidGrant("Refresh token already used");
   return tokenResponse(accessToken, refreshToken, grant.scopes);

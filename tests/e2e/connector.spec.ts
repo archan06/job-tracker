@@ -48,6 +48,8 @@ test("signed out: sign in, see consent, Allow, and land back on the app with a c
   const { url, client_id, verifier } = await authorizeUrl(page);
   await page.goto(url);
   await expect(page).toHaveURL(/\/login\?callbackUrl=/);
+  // Typing before the login form hydrates can be lost (a known issue on main), so let it load first.
+  await page.waitForLoadState("networkidle");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("e2e-password-123");
   await page.getByRole("button", { name: "Sign in" }).click();

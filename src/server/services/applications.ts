@@ -207,3 +207,125 @@ export async function deleteApplication(userId: string, id: string): Promise<voi
   const { count } = await db.application.deleteMany({ where: { id, userId } });
   if (count === 0) throw new NotFoundError();
 }
+
+// ── Changes made by forwarded emails ─────────────────────────────────────
+
+/** What a forwarded email changed, so it can be undone exactly. */
+export type EmailChangeRecord = {
+  applicationId: string;
+  previousStatus: ApplicationStatus | null;
+  previousDateApplied: Date | null;
+  appliedStatus: ApplicationStatus | null;
+  eventIds: string[];
+  updatedAt: Date;
+};
+
+export type EmailChange = {
+  toStatus: ApplicationStatus | null;
+  /** The email's calendar day (UTC). */
+  date: Date;
+  summary: string;
+  /** Adds an INTERVIEW timeline entry on this day. */
+  interviewDate: Date | null;
+};
+
+/** Thrown when undoing an email change after the application was edited since. */
+export class ChangedSinceError extends Error {
+  constructor() {
+    super("Changed since: edit it directly");
+    this.name = "ChangedSinceError";
+  }
+}
+
+async function emailEvents(tx: Tx, applicationId: string, change: EmailChange): Promise<string[]> {
+  const ids: string[] = [];
+  if (change.interviewDate) {
+    const interview = await tx.event.create({ data: { applicationId, type: "INTERVIEW", date: change.interviewDate, notes: change.summary } });
+    ids.push(interview.id);
+  }
+  const email = await tx.event.create({ data: { applicationId, type: "EMAIL", date: change.date, notes: `From email: ${change.summary}` } });
+  ids.push(email.id);
+  return ids;
+}
+
+/** Applies an email's change to one of the user's applications, inside the caller's transaction. */
+export async function applyEmailChange(tx: Tx, userId: string, applicationId: string, change: EmailChange): Promise<EmailChangeRecord> {
+  const application = await findOwned(tx, userId, applicationId);
+  const eventIds: string[] = [];
+  const toStatus = change.toStatus && change.toStatus !== application.status ? change.toStatus : null;
+  if (toStatus) {
+    const fillDateApplied = toStatus === "APPLIED" && !application.dateApplied;
+    await tx.application.update({
+      where: { id: applicationId },
+      data: { status: toStatus, ...(fillDateApplied ? { dateApplied: change.date } : {}) },
+    });
+    const statusEvent = await tx.event.create({
+      data: { applicationId, type: "STATUS_CHANGE", fromStatus: application.status, toStatus, date: change.date },
+    });
+    eventIds.push(statusEvent.id);
+  }
+  eventIds.push(...(await emailEvents(tx, applicationId, change)));
+  // Counts as activity (moves the card up), and gives undo a version to compare against.
+  const { updatedAt } = await tx.application.update({ where: { id: applicationId }, data: { updatedAt: new Date() } });
+  return {
+    applicationId,
+    previousStatus: application.status,
+    previousDateApplied: application.dateApplied,
+    appliedStatus: toStatus,
+    eventIds,
+    updatedAt,
+  };
+}
+
+/** Creates an application from an email (company + title known), inside the caller's transaction. */
+export async function createApplicationFromEmail(
+  tx: Tx,
+  userId: string,
+  input: { company: string; title: string; companyDomain: string | null; status: ApplicationStatus },
+  change: EmailChange,
+): Promise<EmailChangeRecord> {
+  if ((await tx.application.count({ where: { userId } })) >= MAX_APPLICATIONS_PER_USER) {
+    throw new LimitReachedError(`You've reached the limit of ${MAX_APPLICATIONS_PER_USER.toLocaleString("en-US")} applications.`);
+  }
+  const application = await tx.application.create({
+    data: {
+      userId,
+      company: input.company.slice(0, 100),
+      title: input.title.slice(0, 150),
+      companyDomain: input.companyDomain,
+      status: input.status,
+      dateApplied: input.status === "SAVED" ? null : change.date,
+    },
+  });
+  const created = await tx.event.create({
+    data: { applicationId: application.id, type: "STATUS_CHANGE", fromStatus: null, toStatus: input.status, date: change.date },
+  });
+  const eventIds = [created.id, ...(await emailEvents(tx, application.id, change))];
+  const { updatedAt } = await tx.application.update({ where: { id: application.id }, data: { updatedAt: new Date() } });
+  return { applicationId: application.id, previousStatus: null, previousDateApplied: null, appliedStatus: input.status, eventIds, updatedAt };
+}
+
+/**
+ * Undoes an email's change: deletes the application it created, or removes its timeline entries and
+ * restores the previous status. Refuses if the application changed after the email touched it.
+ */
+export async function revertEmailChange(
+  userId: string,
+  record: Pick<EmailChangeRecord, "applicationId" | "previousStatus" | "previousDateApplied" | "eventIds" | "updatedAt">,
+  created: boolean,
+): Promise<void> {
+  await db.$transaction(async (tx) => {
+    const application = await findOwned(tx, userId, record.applicationId);
+    if (application.updatedAt.getTime() !== record.updatedAt.getTime()) throw new ChangedSinceError();
+    if (created) {
+      await tx.application.delete({ where: { id: application.id } });
+      return;
+    }
+    await tx.event.deleteMany({ where: { applicationId: application.id, id: { in: record.eventIds } } });
+    const { count } = await tx.application.updateMany({
+      where: { id: application.id, userId, updatedAt: record.updatedAt },
+      data: { status: record.previousStatus ?? application.status, dateApplied: record.previousDateApplied },
+    });
+    if (count !== 1) throw new ChangedSinceError();
+  });
+}

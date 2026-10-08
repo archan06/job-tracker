@@ -44,14 +44,31 @@ model User {
   passwordHash  String?
   createdAt     DateTime  @default(now())
 
-  accounts      Account[]
-  sessions      Session[]
-  applications  Application[]
-  oauthCodes    OAuthCode[]
-  oauthGrants   OAuthGrant[]
+  accounts            Account[]
+  sessions            Session[]
+  applications        Application[]
+  oauthCodes          OAuthCode[]
+  oauthGrants         OAuthGrant[]
   /// The secret part of the private forwarding address (u-<token>@<domain>). Null until first used.
-  inboundToken  String?        @unique
-  inboundEmails InboundEmail[]
+  inboundToken        String?                  @unique
+  inboundEmails       InboundEmail[]
+  /// Sign-up time + 7 days for accounts created by sign-up that haven't verified yet; such accounts are deleted after it,
+  /// and may be replaced by a new sign-up. Null for verified accounts and for accounts from before email verification.
+  unverifiedExpiresAt DateTime?
+  verificationTokens  EmailVerificationToken[]
+}
+
+/// A link emailed to confirm an address. Only the SHA-256 of the link's token is stored.
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Application {

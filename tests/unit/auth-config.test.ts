@@ -33,3 +33,17 @@ test("suggestion API calls reach the route, which answers 401 itself instead of 
   expect(authorized("/api/suggest/company?q=acme", "GET", false)).toBe(true);
   expect(authorized("/api/suggestions-admin", "GET", false)).toBe(false);
 });
+
+test("OAuth, discovery and MCP endpoints reach their own handlers signed out", () => {
+  for (const path of ["/oauth/authorize?client_id=x", "/oauth/token", "/oauth/register", "/.well-known/oauth-authorization-server", "/api/mcp"]) {
+    expect(authorized(path, "GET", false)).toBe(true);
+  }
+  expect(authorized("/oauthish", "GET", false)).toBe(false);
+});
+
+test("a signed-in visitor on /login with a safe callbackUrl goes there instead of the board", () => {
+  const result = authorized("/login?callbackUrl=%2Foauth%2Fauthorize%3Fclient_id%3Dx", "GET", true) as Response;
+  expect(result.headers.get("location")).toBe("http://localhost/oauth/authorize?client_id=x");
+  const evil = authorized("/login?callbackUrl=https%3A%2F%2Fevil.example", "GET", true) as Response;
+  expect(evil.headers.get("location")).toBe("http://localhost/board");
+});

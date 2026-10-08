@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FormAlert, Input } from "@/components/ui/field";
 import { googleSignInAction, loginAction } from "@/server/actions/auth";
 
-export function LoginForm({ googleEnabled, urlError }: { googleEnabled: boolean; urlError: string | null }) {
+export function LoginForm({ googleEnabled, urlError, callbackUrl }: { googleEnabled: boolean; urlError: string | null; callbackUrl?: string }) {
   const { formProps, pending, blocked, error } = useFormAction(loginAction);
   const message = error ?? urlError;
 
@@ -15,6 +15,7 @@ export function LoginForm({ googleEnabled, urlError }: { googleEnabled: boolean;
       {googleEnabled && (
         <>
           <form action={googleSignInAction}>
+            {callbackUrl && <input type="hidden" name="callbackUrl" value={callbackUrl} />}
             <Button type="submit" variant="secondary" className="w-full">
               <GoogleLogo size={18} weight="bold" />
               Continue with Google
@@ -29,6 +30,7 @@ export function LoginForm({ googleEnabled, urlError }: { googleEnabled: boolean;
       )}
       <form {...formProps} className="flex flex-col gap-4">
         {message && <FormAlert>{message}</FormAlert>}
+        {callbackUrl && <input type="hidden" name="callbackUrl" value={callbackUrl} />}
         <Field id="email" label="Email">
           <Input id="email" name="email" type="email" autoComplete="email" required />
         </Field>

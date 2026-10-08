@@ -1,4 +1,6 @@
 import type { InboundEmail, InboundEmailState, Prisma } from "@/generated/prisma/client";
+
+type Tx = Prisma.TransactionClient;
 import { normalizeDomain } from "@/lib/company-domain";
 import { todayUtc } from "@/lib/dates";
 import { inboundAddress, newInboundToken, tokenFromRecipients } from "@/lib/inbound/address";
@@ -22,6 +24,15 @@ import type { FetchedEmail, InboundProvider, ReceivedEvent } from "./provider";
 export const MONTHLY_EMAILS_PER_USER = 200;
 /** App-wide, under Resend's free 100 received emails a day. */
 export const DAILY_EMAILS = 90;
+/** Per user, checked first, so one account can't use up the shared daily budget for everyone. */
+export const DAILY_EMAILS_PER_USER = 20;
+const DAY_MS = 24 * 60 * 60_000;
+
+/** Spends one email from the user's and the app's daily budgets; false if either is used up. */
+async function spendDailyBudget(userId: string, now: Date): Promise<boolean> {
+  if (!(await rateLimit(`inbound:day:${userId}`, DAILY_EMAILS_PER_USER, DAY_MS, now)).ok) return false;
+  return (await rateLimit("inbound:day", DAILY_EMAILS, DAY_MS, now)).ok;
+}
 const RETENTION_MS = 90 * 24 * 60 * 60_000;
 const SNIPPET_CHARS = 500;
 
@@ -92,7 +103,17 @@ const changeFields = (record: EmailChangeRecord, created: boolean) => ({
   appliedStatus: record.appliedStatus,
   eventIds: record.eventIds,
   applicationUpdatedAt: record.updatedAt,
+  previousUpdatedAt: record.previousUpdatedAt,
 });
+
+/**
+ * Moves an email out of `from` inside the caller's transaction, or throws so the transaction (and
+ * any board change in it) rolls back: a concurrent action already handled this email.
+ */
+async function transition(tx: Tx, userId: string, id: string, from: InboundEmailState, data: Prisma.InboundEmailUncheckedUpdateInput) {
+  const { count } = await tx.inboundEmail.updateMany({ where: { id, userId, state: from }, data });
+  if (count !== 1) throw new ReviewError("This email was already handled.");
+}
 
 /** The company's own website, as read from the email by the classifier, never a job board's or a personal mailbox's. */
 function employerDomain(c: Classification): string | null {
@@ -143,7 +164,8 @@ type Processed = Awaited<ReturnType<typeof process>>;
 /** Stores the outcome, applying any board change in the same transaction. */
 type BaseFields = { providerId: string; messageId: string; fromAddress: string; subject: string; receivedAt: Date; snippet: string };
 
-async function store(processed: Processed, data: BaseFields, userId: string, existingId?: string) {
+/** `existing`: a retried email, updated only if it's still in that state. */
+async function store(processed: Processed, data: BaseFields, userId: string, existing?: { id: string; state: InboundEmailState }) {
   await db.$transaction(async (tx) => {
     let outcome: Record<string, unknown>;
     if ("apply" in processed) {
@@ -152,8 +174,8 @@ async function store(processed: Processed, data: BaseFields, userId: string, exi
     } else {
       outcome = processed;
     }
-    if (existingId) {
-      await tx.inboundEmail.update({ where: { id: existingId }, data: { ...data, ...outcome } as Prisma.InboundEmailUncheckedUpdateInput });
+    if (existing) {
+      await transition(tx, userId, existing.id, existing.state, { ...data, ...outcome } as Prisma.InboundEmailUncheckedUpdateInput);
     } else {
       await tx.inboundEmail.create({ data: { ...data, ...outcome, userId } as Prisma.InboundEmailUncheckedCreateInput });
     }
@@ -193,7 +215,7 @@ export async function ingestEmail(event: ReceivedEvent, deps: InboundDeps, now =
   const thisMonth = await db.inboundEmail.count({ where: { userId: user.id, createdAt: { gte: startOfMonthUtc(now) } } });
   if (thisMonth >= MONTHLY_EMAILS_PER_USER) {
     processed = { state: "FAILED", reviewReason: "Monthly limit reached" };
-  } else if (!(await rateLimit("inbound:day", DAILY_EMAILS, 24 * 60 * 60_000, now)).ok) {
+  } else if (!(await spendDailyBudget(user.id, now))) {
     processed = { state: "FAILED", reviewReason: "Daily limit reached. Retry tomorrow" };
   } else {
     let email: FetchedEmail;
@@ -255,12 +277,13 @@ export async function undoEmail(userId: string, id: string): Promise<void> {
         previousStatus: email.previousStatus,
         previousDateApplied: email.previousDateApplied,
         eventIds: email.eventIds,
+        previousUpdatedAt: email.previousUpdatedAt,
         updatedAt: email.applicationUpdatedAt,
       },
       email.createdApplication,
     );
   }
-  await db.inboundEmail.update({ where: { id }, data: { state: "UNDONE" } });
+  await db.inboundEmail.updateMany({ where: { id, userId, state: "UPDATED" }, data: { state: "UNDONE" } });
 }
 
 function reviewedKind(email: InboundEmail) {
@@ -286,7 +309,7 @@ export async function applyReview(userId: string, id: string, applicationId: str
     const application = await tx.application.findFirst({ where: { id: applicationId, userId }, select: { status: true } });
     if (!application) throw new NotFoundError();
     const record = await applyEmailChange(tx, userId, applicationId, reviewedChange(email, targetStatus(kind, application.status)));
-    await tx.inboundEmail.update({ where: { id }, data: changeFields(record, false) });
+    await transition(tx, userId, id, "NEEDS_REVIEW", changeFields(record, false));
   });
 }
 
@@ -303,20 +326,21 @@ export async function createFromReview(userId: string, id: string): Promise<void
       { company: email.company!, title: email.jobTitle!, companyDomain: email.companyDomain, status: targetStatus(kind, null) },
       reviewedChange(email, null),
     );
-    await tx.inboundEmail.update({ where: { id }, data: changeFields(record, true) });
+    await transition(tx, userId, id, "NEEDS_REVIEW", changeFields(record, true));
   });
 }
 
 export async function ignoreEmail(userId: string, id: string): Promise<void> {
-  await ownedEmail(userId, id, ["NEEDS_REVIEW", "FAILED"]);
-  await db.inboundEmail.update({ where: { id }, data: { state: "IGNORED" } });
+  const email = await ownedEmail(userId, id, ["NEEDS_REVIEW", "FAILED"]);
+  await enforceWriteLimit(userId);
+  await db.$transaction((tx) => transition(tx, userId, id, email.state, { state: "IGNORED" }));
 }
 
 /** Re-downloads and re-reads an email that couldn't be read. */
 export async function retryEmail(userId: string, id: string, deps: InboundDeps, now = new Date()): Promise<void> {
   const email = await ownedEmail(userId, id, ["FAILED"]);
   await enforceWriteLimit(userId);
-  if (!(await rateLimit("inbound:day", DAILY_EMAILS, 24 * 60 * 60_000, now)).ok) {
+  if (!(await spendDailyBudget(userId, now))) {
     throw new ReviewError("Landed has read its daily limit of emails. Try again tomorrow.");
   }
   let processed: Processed;
@@ -329,7 +353,12 @@ export async function retryEmail(userId: string, id: string, deps: InboundDeps, 
     console.warn("inbound email retry failed", error);
     processed = { state: "FAILED", reviewReason: "Couldn't download this email" };
   }
-  await store(processed, { providerId: email.providerId, messageId: email.messageId, fromAddress: email.fromAddress, subject: email.subject, receivedAt: email.receivedAt, snippet: snippetText }, userId, id);
+  await store(
+    processed,
+    { providerId: email.providerId, messageId: email.messageId, fromAddress: email.fromAddress, subject: email.subject, receivedAt: email.receivedAt, snippet: snippetText },
+    userId,
+    { id, state: "FAILED" },
+  );
 }
 
 /** How many emails are in each state, for the Inbox tabs. */

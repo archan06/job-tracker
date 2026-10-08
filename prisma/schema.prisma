@@ -274,6 +274,8 @@ model InboundEmail {
   eventIds             String[]
   /// The application's updatedAt right after this email changed it; undo is refused if it has moved since.
   applicationUpdatedAt DateTime?
+  /// The application's updatedAt before this email changed it; undo restores it so earlier emails stay undoable.
+  previousUpdatedAt    DateTime?
   createdAt            DateTime           @default(now())
 
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)

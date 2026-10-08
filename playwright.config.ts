@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 import { config } from "dotenv";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 config({ path: ".env.local", quiet: true });
 
@@ -11,6 +13,8 @@ if (!testDb || testDb === process.env.DATABASE_URL) {
 const PORT = 3200;
 
 export const E2E_INBOUND_DOMAIN = "in.landed.test";
+/** Where the app under test "sends" email (EMAIL_SENDER=fake); tests read verification links from it. */
+export const E2E_OUTBOX = join(tmpdir(), "landed-e2e-outbox.jsonl");
 export const E2E_WEBHOOK_SECRET = `whsec_${Buffer.from("landed-e2e-webhook-secret").toString("base64")}`;
 
 export default defineConfig({
@@ -33,6 +37,7 @@ export default defineConfig({
     // AUTH_TRUST_HOST: Auth.js only trusts the request host automatically on Vercel.
     // SUGGEST_PROVIDER: fixed suggestion data instead of calling Logo.dev and Geoapify.
     // INBOUND_*/EMAIL_CLASSIFIER/RESEND_WEBHOOK_SECRET: forwarded-email tests sign fake webhooks; no Resend or Claude calls.
+    // EMAIL_SENDER/FAKE_EMAIL_OUTBOX/APP_URL: verification emails go to a local file, with links to this server.
     env: {
       DATABASE_URL: testDb,
       DIRECT_URL: testDb,
@@ -42,6 +47,9 @@ export default defineConfig({
       EMAIL_CLASSIFIER: "fake",
       INBOUND_EMAIL_DOMAIN: E2E_INBOUND_DOMAIN,
       RESEND_WEBHOOK_SECRET: E2E_WEBHOOK_SECRET,
+      EMAIL_SENDER: "fake",
+      FAKE_EMAIL_OUTBOX: E2E_OUTBOX,
+      APP_URL: `http://localhost:${PORT}`,
     },
   },
 });

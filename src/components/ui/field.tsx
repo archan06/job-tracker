@@ -88,3 +88,12 @@ export function FormAlert({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+/** A good-news message above a form, e.g. "Email verified". */
+export function FormNotice({ children }: { children: ReactNode }) {
+  return (
+    <div role="status" className="rounded-lg border border-status-offer/30 bg-status-offer-soft px-3 py-2.5 text-sm text-status-offer-text">
+      {children}
+    </div>
+  );
+}

@@ -1,5 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
+import { safeCallbackPath } from "@/lib/callback-path";
 
 /** Google sign-in is optional; the app works with email/password alone. */
 export const googleEnabled = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
@@ -26,11 +27,14 @@ export const authConfig = {
       if (PUBLIC_ASSETS.includes(pathname)) return true;
       // API routes check the session themselves and answer 401; a redirect to /login would hand fetch() an HTML page.
       if (pathname.startsWith("/api/suggest/")) return true;
+      // OAuth and MCP endpoints answer for themselves: tokens, JSON errors, or (authorize) their own sign-in redirect.
+      if (pathname.startsWith("/oauth/") || pathname.startsWith("/.well-known/") || pathname === "/api/mcp") return true;
       if (pathname === "/") return Response.redirect(new URL(signedIn ? "/board" : "/login", nextUrl));
       if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
         // Only page visits are redirected. A form submission (Server Action POST) can't follow
         // a redirect, so redirecting it would crash the page instead of signing in.
-        return signedIn && method === "GET" ? Response.redirect(new URL("/board", nextUrl)) : true;
+        if (!signedIn || method !== "GET") return true;
+        return Response.redirect(new URL(safeCallbackPath(nextUrl.searchParams.get("callbackUrl")), nextUrl));
       }
       return signedIn;
     },

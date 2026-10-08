@@ -2,6 +2,7 @@
 
 import { AuthError, CredentialsSignin } from "next-auth";
 import { authErrorMessage } from "@/lib/auth-errors";
+import { safeCallbackPath } from "@/lib/callback-path";
 import { headers } from "next/headers";
 import { registerSchema } from "@/lib/validation/auth";
 import { parseForm } from "@/lib/validation/form";
@@ -12,9 +13,9 @@ import { rateLimit } from "@/server/services/rate-limit";
 import { registerUser } from "@/server/services/users";
 import type { ActionResult } from "./types";
 
-async function signInWithPassword(email: string, password: string): Promise<ActionResult> {
+async function signInWithPassword(email: string, password: string, redirectTo = "/board"): Promise<ActionResult> {
   try {
-    await signIn("credentials", { email, password, redirectTo: "/board" });
+    await signIn("credentials", { email, password, redirectTo });
     return { ok: true };
   } catch (error) {
     // signIn redirects by throwing; only Auth.js errors are failures.
@@ -38,18 +39,18 @@ export async function registerAction(_prev: ActionResult, formData: FormData): P
     if (error instanceof EmailTakenError) return { ok: false, fieldErrors: { email: [error.message] } };
     throw error;
   }
-  return signInWithPassword(parsed.data.email, parsed.data.password);
+  return signInWithPassword(parsed.data.email, parsed.data.password, safeCallbackPath(formData.get("callbackUrl")?.toString()));
 }
 
 export async function loginAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
   if (!email || !password) return { ok: false, error: "Enter your email and password." };
-  return signInWithPassword(email, password);
+  return signInWithPassword(email, password, safeCallbackPath(formData.get("callbackUrl")?.toString()));
 }
 
-export async function googleSignInAction(): Promise<void> {
-  await signIn("google", { redirectTo: "/board" });
+export async function googleSignInAction(formData: FormData): Promise<void> {
+  await signIn("google", { redirectTo: safeCallbackPath(formData.get("callbackUrl")?.toString()) });
 }
 
 export async function signOutAction(): Promise<void> {

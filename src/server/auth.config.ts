@@ -29,6 +29,8 @@ export const authConfig = {
       if (pathname.startsWith("/api/suggest/")) return true;
       // OAuth and MCP endpoints answer for themselves: tokens, JSON errors, or (authorize) their own sign-in redirect.
       if (pathname.startsWith("/oauth/") || pathname.startsWith("/.well-known/") || pathname === "/api/mcp") return true;
+      // Resend's webhook: authenticated by its signature, not a session.
+      if (pathname.startsWith("/api/inbound/")) return true;
       if (pathname === "/") return Response.redirect(new URL(signedIn ? "/board" : "/login", nextUrl));
       if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
         // Only page visits are redirected. A form submission (Server Action POST) can't follow

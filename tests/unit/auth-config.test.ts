@@ -49,3 +49,7 @@ test("a signed-in visitor on /login with a safe callbackUrl goes there instead o
   const tab = authorized("/login?callbackUrl=%2F%09%2Fevil.example", "GET", true) as Response;
   expect(tab.headers.get("location")).toBe("http://localhost/board");
 });
+
+test("the inbound email webhook reaches its handler (it checks Resend's signature itself)", () => {
+  expect(authorized("/api/inbound/resend", "POST", false)).toBe(true);
+});

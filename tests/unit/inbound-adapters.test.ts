@@ -17,10 +17,17 @@ test("Haiku classifier sends a fixed-schema request with the email marked untrus
   expect(request.model).toBe("claude-haiku-4-5");
   expect(request.max_tokens).toBe(1024);
   expect(request.system).toMatch(/untrusted/i);
-  expect(request.output_config.format).toBeTruthy();
+  const schema = (request.output_config.format as { schema: { properties: Record<string, { enum?: string[] }>; additionalProperties: boolean } }).schema;
+  expect(schema.properties.kind.enum).toEqual(["APPLICATION_CONFIRMATION", "INTERVIEW", "REJECTION", "OFFER", "NOT_JOB_RELATED"]);
+  expect(schema.additionalProperties).toBe(false);
   expect(request.messages[0].content).toContain("Thanks for applying");
   expect(request.messages[0].content.length).toBeLessThan(13_000);
   expect(result).toMatchObject({ kind: "APPLICATION_CONFIRMATION", confidence: 1, company: "Stripe" });
+});
+
+test("Haiku classifier rejects output outside the schema (e.g. an invented kind)", async () => {
+  const invented = { messages: { parse: async () => ({ stop_reason: "end_turn", parsed_output: { kind: "ASSESSMENT", confidence: 0.9, company: null, jobTitle: null, companyDomain: null, interviewAt: null, summary: "x" } }) } } as never;
+  await expect(haikuClassifier(invented).classify(email)).rejects.toThrow();
 });
 
 test("Haiku classifier throws on refusal or unparseable output", async () => {

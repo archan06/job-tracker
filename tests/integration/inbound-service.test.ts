@@ -239,3 +239,13 @@ test("concurrent first visits agree on one address (no overwrite race)", async (
   expect(new Set(addresses).size).toBe(1);
   expect((await ingestEmail(event(addresses[0]), harness({ kind: "NOT_JOB_RELATED" }).deps)).status).toBe("stored");
 });
+
+test("an email forwarded by hand from the user's own Gmail never stamps gmail.com on the application", async () => {
+  const u = await makeUser();
+  const to = await addressFor(u.id);
+  await ingestEmail(event(to, { from: "Me <me@gmail.com>" }), harness({}, { from: "Me <me@gmail.com>" }).deps);
+  const [email] = await listInbox(u.id, "UPDATED");
+  expect((await getApplication(u.id, email.applicationId!)).companyDomain).toBeNull();
+  await ingestEmail(event(to, { from: "Me <me@gmail.com>" }), harness({ kind: "REJECTION", company: "Acme" }, { from: "Me <me@gmail.com>" }).deps);
+  expect((await getApplication(u.id, email.applicationId!)).status).toBe("APPLIED");
+});

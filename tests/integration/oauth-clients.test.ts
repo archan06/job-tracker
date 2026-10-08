@@ -57,7 +57,7 @@ test("a CIMD fetch failure uses the cached copy, or resolves to null without one
   const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   const failing = vi.fn(async () => Promise.reject(new Error("down")));
   expect(await resolveClient(id, { fetchMetadata: failing, now })).toBeNull();
-  await db.oAuthClient.create({ data: { id, name: "Claude", redirectUris: ["https://claude.ai/cb"], kind: "CIMD", refreshedAt: new Date("2020-01-01") } });
+  await db.oAuthClient.create({ data: { id, name: "Claude", redirectUris: ["https://claude.ai/cb"], kind: "CIMD", refreshedAt: new Date(now.getTime() - 2 * 24 * 60 * 60_000) } });
   expect(await resolveClient(id, { fetchMetadata: failing, now })).toMatchObject({ name: "Claude" });
   warn.mockRestore();
 });
@@ -65,4 +65,13 @@ test("a CIMD fetch failure uses the cached copy, or resolves to null without one
 test("a DCR id that looks like a URL can't be registered, so CIMD ids can't be spoofed", async () => {
   const res = await registerClient({ redirect_uris: ["https://ok.example/cb"] }, now);
   expect(res.client_id.startsWith("https://")).toBe(false);
+});
+
+test("a CIMD client whose metadata has been unreachable for over 7 days stops resolving", async () => {
+  const id = "https://claude.ai/oauth/claude-client.json";
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  const failing = vi.fn(async () => Promise.reject(new Error("gone")));
+  await db.oAuthClient.create({ data: { id, name: "Claude", redirectUris: ["https://claude.ai/cb"], kind: "CIMD", refreshedAt: new Date(now.getTime() - 8 * 24 * 60 * 60_000) } });
+  expect(await resolveClient(id, { fetchMetadata: failing, now })).toBeNull();
+  warn.mockRestore();
 });

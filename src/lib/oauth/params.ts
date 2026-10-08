@@ -6,12 +6,15 @@ export const SCOPE_LABELS: Record<Scope, string> = {
   "applications:write": "Add and update applications",
 };
 
-/** Requested scopes in canonical order. Nothing requested means both; any unknown scope means null (invalid_scope). */
+/**
+ * The granted scopes, in canonical order: the requested ones Landed knows (others, like "openid", are
+ * ignored). Nothing requested means both; only unknown scopes means null (invalid_scope).
+ */
 export function parseScopes(raw: string | null | undefined): Scope[] | null {
   const requested = (raw ?? "").split(/\s+/).filter(Boolean);
   if (requested.length === 0) return [...SCOPES];
-  if (requested.some((s) => !(SCOPES as readonly string[]).includes(s))) return null;
-  return SCOPES.filter((s) => requested.includes(s));
+  const known = SCOPES.filter((s) => requested.includes(s));
+  return known.length > 0 ? known : null;
 }
 
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);

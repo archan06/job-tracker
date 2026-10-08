@@ -5,13 +5,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Button } from "@/components/ui/button";
+import { impersonatedApp } from "@/lib/oauth/lookalike";
 import { SCOPE_LABELS } from "@/lib/oauth/params";
 import { decideConsentAction } from "@/server/actions/oauth";
 import { auth } from "@/server/auth";
 import { validateAuthorizeRequest } from "@/server/oauth/authorize";
 import { originFromHeaders } from "@/server/oauth/urls";
+import { rateLimit } from "@/server/services/rate-limit";
 
 export const metadata: Metadata = { title: "Connect an app" };
+
+/** Consent page loads per user per hour; each can trigger a client metadata fetch. */
+const AUTHORIZE_PER_HOUR = 60;
 
 function Card({ children }: { children: React.ReactNode }) {
   return <div className="rounded-xl border border-border bg-surface p-6 shadow-card sm:p-8">{children}</div>;
@@ -25,9 +30,13 @@ export default async function AuthorizePage(props: PageProps<"/oauth/authorize">
   const query = new URLSearchParams(params).toString();
   const origin = originFromHeaders(await headers());
 
-  const result = await validateAuthorizeRequest(params, origin);
+  // Sign-in comes first: nothing (client lookups, metadata fetches) runs for anonymous visitors.
+  const session = await auth();
+  if (!session?.user?.id) redirect(`/login?callbackUrl=${encodeURIComponent(`/oauth/authorize?${query}`)}`);
+
+  const limit = await rateLimit(`oauth:authorize:${session.user.id}`, AUTHORIZE_PER_HOUR, 60 * 60_000);
+  const result = limit.ok ? await validateAuthorizeRequest(params, origin) : { ok: false as const, message: "Too many connection attempts. Try again later." };
   if (!result.ok) {
-    if (result.redirect) redirect(result.redirect.toString());
     return (
       <Card>
         <h1 className="text-xl font-semibold tracking-tight text-text">Can&apos;t connect this app</h1>
@@ -39,20 +48,29 @@ export default async function AuthorizePage(props: PageProps<"/oauth/authorize">
     );
   }
 
-  const session = await auth();
-  if (!session?.user?.id) redirect(`/login?callbackUrl=${encodeURIComponent(`/oauth/authorize?${query}`)}`);
-
   const { client, redirectUri, scopes } = result.request;
+  const redirectHost = new URL(redirectUri).host;
   const publisher = client.kind === "CIMD" ? new URL(client.id).hostname : null;
+  const imitating = impersonatedApp(client.name, new URL(redirectUri).hostname);
 
   return (
     <Card>
       <h1 className="text-xl font-semibold tracking-tight text-text">
-        Allow <span className="wrap-anywhere">{client.name}</span> to access your Landed board?
+        Allow <span className="wrap-anywhere">{client.name}</span>{" "}
+        <span className="font-normal text-muted">({redirectHost})</span> to access your Landed board?
       </h1>
       <p className="mt-1.5 text-sm text-muted">
         Signed in as <span className="font-medium text-text">{session.user.email}</span>
       </p>
+
+      {imitating && (
+        <p role="alert" className="mt-4 flex items-start gap-2 rounded-lg bg-danger-soft px-3 py-2.5 text-sm text-danger-text">
+          <Warning size={18} weight="fill" className="mt-px shrink-0" />
+          <span>
+            This isn&apos;t the official {imitating}: it would send you to {redirectHost}. Deny unless you set it up yourself.
+          </span>
+        </p>
+      )}
 
       {publisher ? (
         <p className="mt-4 text-sm text-muted">Published by {publisher}</p>
@@ -75,7 +93,7 @@ export default async function AuthorizePage(props: PageProps<"/oauth/authorize">
       <p className="mt-3 text-xs text-subtle">It can&apos;t delete anything. You can disconnect it anytime in Connected apps.</p>
 
       <p className="mt-5 text-xs text-subtle">
-        You&apos;ll be sent back to <span className="font-medium text-muted">{new URL(redirectUri).host}</span>
+        You&apos;ll be sent back to <span className="font-medium text-muted">{redirectHost}</span>
       </p>
 
       <form action={decideConsentAction} className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

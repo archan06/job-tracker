@@ -7,6 +7,8 @@ import { fetchClientMetadata, isMetadataUrl } from "./cimd";
 import { OAuthError } from "./errors";
 
 const CIMD_TTL_MS = 24 * 60 * 60_000;
+/** If a client's metadata can't be fetched for this long, it stops working. */
+const CIMD_MAX_STALE_MS = 7 * 24 * 60 * 60_000;
 
 const registrationSchema = z.object({
   client_name: z.string().trim().min(1).max(100).optional(),
@@ -56,6 +58,6 @@ export async function resolveClient(clientId: string, { fetchMetadata = fetchCli
     return await db.oAuthClient.upsert({ where: { id: clientId }, create: { id: clientId, ...data }, update: data });
   } catch (error) {
     console.warn("client metadata fetch failed", clientId, error);
-    return cached;
+    return cached && now.getTime() - cached.refreshedAt.getTime() < CIMD_MAX_STALE_MS ? cached : null;
   }
 }

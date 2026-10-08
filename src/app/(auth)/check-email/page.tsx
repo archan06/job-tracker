@@ -26,7 +26,7 @@ export default async function CheckEmailPage(props: PageProps<"/check-email">) {
           We sent a link to <span className="font-medium wrap-anywhere text-text">{address || "your email address"}</span>. Open it within 24 hours to
           verify your account.
         </p>
-        {limited === "1" && <p className="font-medium text-text">We couldn&apos;t send another email right now. Try again in an hour.</p>}
+        {limited === "1" && <p className="font-medium text-text">We couldn&apos;t send the email just now. Use Resend email below, or try again later.</p>}
         <p>Can&apos;t find it? Check your spam folder.</p>
         {address && <ResendVerification email={address} />}
       </div>

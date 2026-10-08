@@ -5,21 +5,19 @@ import { useState } from "react";
 import { ResendVerification } from "@/components/auth/resend-verification";
 import { useFormAction } from "@/components/forms/use-form-action";
 import { Button } from "@/components/ui/button";
-import { Field, FormAlert, FormNotice, Input } from "@/components/ui/field";
+import { Field, FormAlert, Input } from "@/components/ui/field";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { googleSignInAction, loginAction } from "@/server/actions/auth";
 
-const UNVERIFIED = authErrorMessage("unverified");
+const UNVERIFIED = [authErrorMessage("unverified"), authErrorMessage("unverified_unsent")];
 
 export function LoginForm({
   googleEnabled,
   urlError,
-  notice = null,
   callbackUrl,
 }: {
   googleEnabled: boolean;
   urlError: string | null;
-  notice?: string | null;
   callbackUrl?: string;
 }) {
   const { formProps, pending, blocked, error } = useFormAction(loginAction);
@@ -53,7 +51,7 @@ export function LoginForm({
         }}
         className="flex flex-col gap-4"
       >
-        {message ? <FormAlert>{message}</FormAlert> : notice && <FormNotice>{notice}</FormNotice>}
+        {message && <FormAlert>{message}</FormAlert>}
         {callbackUrl && <input type="hidden" name="callbackUrl" value={callbackUrl} />}
         <Field id="email" label="Email">
           <Input id="email" name="email" type="email" autoComplete="email" required />
@@ -65,7 +63,7 @@ export function LoginForm({
           {pending ? "Signing in..." : "Sign in"}
         </Button>
       </form>
-      {error === UNVERIFIED && email && <ResendVerification email={email} />}
+      {error && UNVERIFIED.includes(error) && email && <ResendVerification email={email} />}
     </div>
   );
 }

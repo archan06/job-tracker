@@ -10,11 +10,10 @@ import { LoginForm } from "./login-form";
 export const metadata: Metadata = { title: "Sign in" };
 
 async function LoginFormWithUrlError({ searchParams }: { searchParams: PageProps<"/login">["searchParams"] }) {
-  const { error, callbackUrl, verified } = await searchParams;
+  const { error, callbackUrl } = await searchParams;
   return (
     <LoginForm
       googleEnabled={googleEnabled}
-      notice={verified === "1" ? "Email verified. Sign in to continue." : null}
       urlError={authErrorMessage(typeof error === "string" ? error : undefined)}
       callbackUrl={typeof callbackUrl === "string" ? safeCallbackPath(callbackUrl) : undefined}
     />

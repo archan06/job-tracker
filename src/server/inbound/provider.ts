@@ -31,7 +31,8 @@ function toEvent(raw: RawEvent): ReceivedEvent {
   return {
     type: "email.received",
     emailId: d.email_id,
-    messageId: d.message_id,
+    // Some emails have no Message-ID; Resend's own id keeps them from colliding as "duplicates".
+    messageId: d.message_id?.trim() || d.email_id,
     from: d.from,
     subject: d.subject ?? "",
     recipients: [...(d.received_for ?? []), ...(d.to ?? [])],

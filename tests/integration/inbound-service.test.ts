@@ -4,6 +4,8 @@ import { db } from "@/server/db";
 import type { EmailClassifier } from "@/server/inbound/classifier";
 import type { FetchedEmail, InboundProvider, ReceivedEvent } from "@/server/inbound/provider";
 import {
+  DAILY_EMAILS,
+  DAILY_EMAILS_PER_USER,
   MONTHLY_EMAILS_PER_USER,
   ReviewError,
   applyReview,
@@ -248,4 +250,77 @@ test("an email forwarded by hand from the user's own Gmail never stamps gmail.co
   expect((await getApplication(u.id, email.applicationId!)).companyDomain).toBeNull();
   await ingestEmail(event(to, { from: "Me <me@gmail.com>" }), harness({ kind: "REJECTION", company: "Acme" }, { from: "Me <me@gmail.com>" }).deps);
   expect((await getApplication(u.id, email.applicationId!)).status).toBe("APPLIED");
+});
+
+test("one account at its daily limit can't block anyone else's emails", async () => {
+  const spammer = await makeUser();
+  const other = await makeUser();
+  await db.rateLimit.create({ data: { key: `inbound:day:${spammer.id}`, count: DAILY_EMAILS_PER_USER, resetAt: new Date(Date.now() + 60 * 60_000) } });
+  const { deps, classify } = harness();
+  await ingestEmail(event(await addressFor(spammer.id)), deps);
+  expect((await listInbox(spammer.id, "FAILED"))[0].reviewReason).toMatch(/Daily limit/);
+  expect(classify).not.toHaveBeenCalled();
+  expect((await ingestEmail(event(await addressFor(other.id)), deps)).status).toBe("stored");
+  expect(await listInbox(other.id, "UPDATED")).toHaveLength(1);
+  const global = await db.rateLimit.findUnique({ where: { key: "inbound:day" } });
+  expect(global?.count).toBe(1);
+});
+
+test("the app-wide daily cap still applies", async () => {
+  const u = await makeUser();
+  await db.rateLimit.create({ data: { key: "inbound:day", count: DAILY_EMAILS, resetAt: new Date(Date.now() + 60 * 60_000) } });
+  const { deps, classify } = harness();
+  await ingestEmail(event(await addressFor(u.id)), deps);
+  expect(classify).not.toHaveBeenCalled();
+  expect((await listInbox(u.id, "FAILED"))[0].reviewReason).toMatch(/Daily limit/);
+});
+
+test("two simultaneous 'Create new application' clicks create one application", async () => {
+  const u = await makeUser();
+  await ingestEmail(event(await addressFor(u.id)), harness({ kind: "OFFER", company: "Figma", jobTitle: "Designer" }).deps);
+  const [email] = await listInbox(u.id, "NEEDS_REVIEW");
+  const results = await Promise.allSettled([createFromReview(u.id, email.id), createFromReview(u.id, email.id)]);
+  expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+  expect(await db.application.count({ where: { userId: u.id } })).toBe(1);
+});
+
+test("ignoring an email while a slow retry runs wins: the retry doesn't apply its change", async () => {
+  const u = await makeUser();
+  await ingestEmail(event(await addressFor(u.id)), harness(new Error("API down")).deps);
+  const [failed] = await listInbox(u.id, "FAILED");
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  const slow = harness();
+  const classify = slow.deps.classifier.classify;
+  slow.deps.classifier = { classify: async (e) => { await gate; return classify(e); } };
+  const retrying = retryEmail(u.id, failed.id, slow.deps);
+  await new Promise((r) => setTimeout(r, 200));
+  await ignoreEmail(u.id, failed.id);
+  release();
+  await expect(retrying).rejects.toThrow(ReviewError);
+  expect((await db.inboundEmail.findUniqueOrThrow({ where: { id: failed.id } })).state).toBe("IGNORED");
+  expect(await db.application.count({ where: { userId: u.id } })).toBe(0);
+});
+
+test("the same email delivered twice at once is applied once", async () => {
+  const u = await makeUser();
+  const e = event(await addressFor(u.id));
+  const { deps } = harness();
+  const results = await Promise.all([ingestEmail(e, deps), ingestEmail({ ...e, emailId: "em_dup" }, deps)]);
+  expect(results.map((r) => r.status).sort()).toEqual(["duplicate", "stored"]);
+  expect(await db.application.count({ where: { userId: u.id } })).toBe(1);
+});
+
+test("undo order: an earlier email can't be undone after a later one; the later one can", async () => {
+  const u = await makeUser();
+  const a = await makeApplication(u.id, { company: "Stripe", title: "Software Engineer", status: "APPLIED" });
+  const to = await addressFor(u.id);
+  await ingestEmail(event(to), harness({ kind: "INTERVIEW" }).deps);
+  await ingestEmail(event(to), harness({ kind: "OFFER" }).deps);
+  const [offer, interview] = await listInbox(u.id, "UPDATED");
+  await expect(undoEmail(u.id, interview.id)).rejects.toThrow("Changed since");
+  await undoEmail(u.id, offer.id);
+  expect((await getApplication(u.id, a.id)).status).toBe("INTERVIEW");
+  await undoEmail(u.id, interview.id);
+  expect((await getApplication(u.id, a.id)).status).toBe("APPLIED");
 });

@@ -217,6 +217,8 @@ export type EmailChangeRecord = {
   previousDateApplied: Date | null;
   appliedStatus: ApplicationStatus | null;
   eventIds: string[];
+  /** updatedAt before the change (null for a created application). */
+  previousUpdatedAt: Date | null;
   updatedAt: Date;
 };
 
@@ -273,6 +275,7 @@ export async function applyEmailChange(tx: Tx, userId: string, applicationId: st
     previousDateApplied: application.dateApplied,
     appliedStatus: toStatus,
     eventIds,
+    previousUpdatedAt: application.updatedAt,
     updatedAt,
   };
 }
@@ -302,7 +305,7 @@ export async function createApplicationFromEmail(
   });
   const eventIds = [created.id, ...(await emailEvents(tx, application.id, change))];
   const { updatedAt } = await tx.application.update({ where: { id: application.id }, data: { updatedAt: new Date() } });
-  return { applicationId: application.id, previousStatus: null, previousDateApplied: null, appliedStatus: input.status, eventIds, updatedAt };
+  return { applicationId: application.id, previousStatus: null, previousDateApplied: null, appliedStatus: input.status, eventIds, previousUpdatedAt: null, updatedAt };
 }
 
 /**
@@ -311,20 +314,26 @@ export async function createApplicationFromEmail(
  */
 export async function revertEmailChange(
   userId: string,
-  record: Pick<EmailChangeRecord, "applicationId" | "previousStatus" | "previousDateApplied" | "eventIds" | "updatedAt">,
+  record: Pick<EmailChangeRecord, "applicationId" | "previousStatus" | "previousDateApplied" | "eventIds" | "previousUpdatedAt" | "updatedAt">,
   created: boolean,
 ): Promise<void> {
   await db.$transaction(async (tx) => {
     const application = await findOwned(tx, userId, record.applicationId);
     if (application.updatedAt.getTime() !== record.updatedAt.getTime()) throw new ChangedSinceError();
     if (created) {
-      await tx.application.delete({ where: { id: application.id } });
+      const { count } = await tx.application.deleteMany({ where: { id: application.id, userId, updatedAt: record.updatedAt } });
+      if (count !== 1) throw new ChangedSinceError();
       return;
     }
     await tx.event.deleteMany({ where: { applicationId: application.id, id: { in: record.eventIds } } });
     const { count } = await tx.application.updateMany({
       where: { id: application.id, userId, updatedAt: record.updatedAt },
-      data: { status: record.previousStatus ?? application.status, dateApplied: record.previousDateApplied },
+      data: {
+        status: record.previousStatus ?? application.status,
+        dateApplied: record.previousDateApplied,
+        // Back to exactly how it was, so an earlier email's undo still recognizes it.
+        ...(record.previousUpdatedAt ? { updatedAt: record.previousUpdatedAt } : {}),
+      },
     });
     if (count !== 1) throw new ChangedSinceError();
   });

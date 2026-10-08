@@ -63,3 +63,11 @@ test("fake provider accepts only correctly signed received events and returns th
   expect(provider.verify(body.replace("Hi", "Ho"), headers)).toBeNull();
   expect(provider.verify(body, new Headers())).toBeNull();
 });
+
+test("an event without a Message-ID falls back to Resend's email id, so it isn't mistaken for a duplicate", async () => {
+  const secret = `whsec_${Buffer.from("test-secret-0123456789").toString("base64")}`;
+  const body = JSON.stringify({ type: "email.received", created_at: "2026-10-08T10:00:00Z", data: { email_id: "em_9", message_id: "", from: "a@b.com", to: ["x@y.z"], subject: "Hi" } });
+  const ts = new Date();
+  const headers = new Headers({ "svix-id": "m9", "svix-timestamp": String(Math.floor(ts.getTime() / 1000)), "svix-signature": new Webhook(secret).sign("m9", ts, body) });
+  expect(fakeProvider(secret).verify(body, headers)).toMatchObject({ messageId: "em_9" });
+});

@@ -77,3 +77,17 @@ export function decideEmail(c: Classification, candidates: Candidate[], sender: 
       return update(found.id, s === "OFFER" ? null : "OFFER");
   }
 }
+
+/** The status a user-confirmed email moves an application to (review "Apply to"): the user's choice wins, even backwards. */
+export function targetStatus(kind: Exclude<EmailKind, "NOT_JOB_RELATED">, current: ApplicationStatus | null): ApplicationStatus {
+  switch (kind) {
+    case "APPLICATION_CONFIRMATION":
+      return current && current !== "SAVED" ? current : "APPLIED";
+    case "INTERVIEW":
+      return "INTERVIEW";
+    case "REJECTION":
+      return "REJECTED";
+    case "OFFER":
+      return "OFFER";
+  }
+}

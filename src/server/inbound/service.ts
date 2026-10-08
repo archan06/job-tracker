@@ -40,7 +40,10 @@ export class ReviewError extends Error {
 export async function getOrCreateInboundAddress(userId: string, domain: string): Promise<string> {
   const user = await db.user.findUniqueOrThrow({ where: { id: userId }, select: { inboundToken: true } });
   if (user.inboundToken) return inboundAddress(user.inboundToken, domain);
-  return regenerateInboundAddress(userId, domain);
+  // Only set it if still unset: two first visits at once (e.g. a prefetch) must not overwrite each other's address.
+  await db.user.updateMany({ where: { id: userId, inboundToken: null }, data: { inboundToken: newInboundToken() } });
+  const { inboundToken } = await db.user.findUniqueOrThrow({ where: { id: userId }, select: { inboundToken: true } });
+  return inboundAddress(inboundToken!, domain);
 }
 
 /** A new private address; the old one stops working immediately. */
@@ -328,4 +331,12 @@ export async function retryEmail(userId: string, id: string, deps: InboundDeps, 
     processed = { state: "FAILED", reviewReason: "Couldn't download this email" };
   }
   await store(processed, { providerId: email.providerId, messageId: email.messageId, fromAddress: email.fromAddress, subject: email.subject, receivedAt: email.receivedAt, snippet: snippetText }, userId, id);
+}
+
+/** How many emails are in each state, for the Inbox tabs. */
+export async function inboxCounts(userId: string): Promise<Record<InboundEmailState, number>> {
+  const rows = await db.inboundEmail.groupBy({ by: ["state"], where: { userId }, _count: { _all: true } });
+  const counts = { UPDATED: 0, NEEDS_REVIEW: 0, IGNORED: 0, FAILED: 0, UNDONE: 0 } as Record<InboundEmailState, number>;
+  for (const row of rows) counts[row.state] = row._count._all;
+  return counts;
 }

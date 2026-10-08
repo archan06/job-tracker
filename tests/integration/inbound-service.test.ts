@@ -232,3 +232,10 @@ test("regenerating the address retires the old one", async () => {
   expect((await ingestEmail(event(old), harness().deps)).status).toBe("ignored");
   expect((await ingestEmail(event(fresh), harness().deps)).status).toBe("stored");
 });
+
+test("concurrent first visits agree on one address (no overwrite race)", async () => {
+  const u = await makeUser();
+  const addresses = await Promise.all(Array.from({ length: 5 }, () => getOrCreateInboundAddress(u.id, DOMAIN)));
+  expect(new Set(addresses).size).toBe(1);
+  expect((await ingestEmail(event(addresses[0]), harness({ kind: "NOT_JOB_RELATED" }).deps)).status).toBe("stored");
+});

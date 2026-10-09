@@ -160,7 +160,7 @@ Setup:
 
 1. In [Resend](https://resend.com), set up receiving: use the free `<id>.resend.app` domain, or add an MX record for a subdomain you own (e.g. `in.example.com`). Put it in `INBOUND_EMAIL_DOMAIN`.
 2. Add a webhook for the `email.received` event pointing to `https://<your-domain>/api/inbound/resend`, and copy its signing secret into `RESEND_WEBHOOK_SECRET`. Put an API key in `RESEND_API_KEY`.
-3. Put an Anthropic API key in `ANTHROPIC_API_KEY` (emails are read by Claude Haiku 4.5, about $0.003 each). Limits: 200 emails per user per month and 90 per day across the app.
+3. Put an Anthropic API key in `ANTHROPIC_API_KEY` (emails are read by Claude Haiku 4.5, about $0.003 each). Limits: 60 emails per user per day, 1,000 per user per month, and 90 per day across the app (under Resend's free plan).
 
 Landed stores only the sender, subject and a 500-character preview, for 90 days. `npm run eval:email` checks classification accuracy on 25 sample emails against the real model (about $0.08 a run).
 

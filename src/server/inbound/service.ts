@@ -21,11 +21,11 @@ import { enforceWriteLimit, rateLimit } from "@/server/services/rate-limit";
 import type { EmailClassifier } from "./classifier";
 import type { FetchedEmail, InboundProvider, ReceivedEvent } from "./provider";
 
-export const MONTHLY_EMAILS_PER_USER = 200;
+export const MONTHLY_EMAILS_PER_USER = 1000;
 /** App-wide, under Resend's free 100 received emails a day. */
 export const DAILY_EMAILS = 90;
 /** Per user, checked first, so one account can't use up the shared daily budget for everyone. */
-export const DAILY_EMAILS_PER_USER = 20;
+export const DAILY_EMAILS_PER_USER = 60;
 const DAY_MS = 24 * 60 * 60_000;
 
 /** Spends one email from the user's and the app's daily budgets; false if either is used up. */

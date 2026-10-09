@@ -340,3 +340,9 @@ test("undo order: an earlier email can't be undone after a later one; the later 
   await undoEmail(u.id, interview.id);
   expect((await getApplication(u.id, a.id)).status).toBe("APPLIED");
 });
+
+test("limits leave room for an active job search, under the app-wide daily budget", () => {
+  expect(DAILY_EMAILS_PER_USER).toBe(60);
+  expect(MONTHLY_EMAILS_PER_USER).toBe(1000);
+  expect(DAILY_EMAILS_PER_USER).toBeLessThan(DAILY_EMAILS);
+});

@@ -29,9 +29,8 @@ test("confirmation: Saved moves to Applied; later stages are only logged", () =>
   expect(decideEmail(base, [app({ status: "INTERVIEW" })], null)).toEqual({ kind: "UPDATE", applicationId: "a1", toStatus: null, addInterview: false });
 });
 
-test("confirmation with no match creates an application, if company and title are known", () => {
+test("confirmation with no match creates an application, if the company is known", () => {
   expect(decideEmail(base, [], null)).toEqual({ kind: "CREATE" });
-  expect(decideEmail(c({ jobTitle: null }), [], null)).toMatchObject({ kind: "REVIEW" });
   expect(decideEmail(c({ company: null }), [], null)).toMatchObject({ kind: "REVIEW" });
 });
 
@@ -79,4 +78,10 @@ test("a sender-domain match never overrides a company name that disagrees", () =
   const stripe = app({ id: "s", company: "Stripe", companyDomain: "stripe.com", status: "APPLIED" });
   expect(decideEmail(c({ kind: "REJECTION", company: "Acme" }), [stripe], "stripe.com")).toMatchObject({ kind: "REVIEW" });
   expect(decideEmail(c({ kind: "REJECTION", company: null }), [stripe], "stripe.com")).toMatchObject({ kind: "UPDATE", applicationId: "s" });
+});
+
+test("a confirmation that names the company but not the job (e.g. Handshake) still creates an application", () => {
+  expect(decideEmail(c({ jobTitle: null }), [], null)).toEqual({ kind: "CREATE" });
+  expect(decideEmail(c({ jobTitle: null, company: null }), [], null)).toMatchObject({ kind: "REVIEW" });
+  expect(decideEmail(c({ kind: "OFFER", jobTitle: null }), [], null)).toMatchObject({ kind: "REVIEW" });
 });

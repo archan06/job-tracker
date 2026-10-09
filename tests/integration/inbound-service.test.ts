@@ -346,3 +346,23 @@ test("limits leave room for an active job search, under the app-wide daily budge
   expect(MONTHLY_EMAILS_PER_USER).toBe(1000);
   expect(DAILY_EMAILS_PER_USER).toBeLessThan(DAILY_EMAILS);
 });
+
+test("a confirmation without a job title (e.g. Handshake) adds the company as 'Role not listed'", async () => {
+  const u = await makeUser();
+  const to = await addressFor(u.id);
+  await ingestEmail(event(to, { from: "Handshake <handshake@notifications.joinhandshake.com>" }), harness({ company: "Noon AI", jobTitle: null }).deps);
+  const [email] = await listInbox(u.id, "UPDATED");
+  expect(email.createdApplication).toBe(true);
+  const app = await getApplication(u.id, email.applicationId!);
+  expect(app).toMatchObject({ company: "Noon AI", title: "Role not listed", status: "APPLIED" });
+});
+
+test("create-from-review works with only a company, titled 'Role not listed'", async () => {
+  const u = await makeUser();
+  const to = await addressFor(u.id);
+  await ingestEmail(event(to), harness({ company: "Mass Contracting Corp", jobTitle: null, confidence: 0.6 }).deps);
+  const [email] = await listInbox(u.id, "NEEDS_REVIEW");
+  await createFromReview(u.id, email.id);
+  const created = (await listInbox(u.id, "UPDATED")).find((e) => e.id === email.id)!;
+  expect(await getApplication(u.id, created.applicationId!)).toMatchObject({ company: "Mass Contracting Corp", title: "Role not listed", status: "APPLIED" });
+});

@@ -115,7 +115,7 @@ export default async function EmailPage(props: PageProps<"/email">) {
                 </div>
                 <div className="shrink-0">
                   {email.state === "UPDATED" && <UndoButton id={email.id} />}
-                  {email.state === "NEEDS_REVIEW" && <ReviewActions id={email.id} applications={options} canCreate={!!email.company && !!email.jobTitle} />}
+                  {email.state === "NEEDS_REVIEW" && <ReviewActions id={email.id} applications={options} canCreate={!!email.company} />}
                   {email.state === "FAILED" && <FailedActions id={email.id} />}
                 </div>
               </li>

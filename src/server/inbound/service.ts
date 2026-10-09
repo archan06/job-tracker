@@ -5,7 +5,7 @@ import { normalizeDomain } from "@/lib/company-domain";
 import { todayUtc } from "@/lib/dates";
 import { inboundAddress, newInboundToken, tokenFromRecipients } from "@/lib/inbound/address";
 import { isAtsDomain, senderDomain } from "@/lib/inbound/companies";
-import { decideEmail, targetStatus, type Classification } from "@/lib/inbound/decide";
+import { decideEmail, ROLE_NOT_LISTED, targetStatus, type Classification } from "@/lib/inbound/decide";
 import { gmailForwardingConfirmation } from "@/lib/inbound/forwarding";
 import { snippet } from "@/lib/inbound/text";
 import { db } from "@/server/db";
@@ -155,7 +155,7 @@ async function process(userId: string, email: FetchedEmail, classifier: EmailCla
     }
     case "CREATE": {
       const change = changeFor(c, email.date, null, false);
-      const input = { company: c.company!, title: c.jobTitle!, companyDomain: employerDomain(c), status: "APPLIED" as const };
+      const input = { company: c.company!, title: c.jobTitle || ROLE_NOT_LISTED, companyDomain: employerDomain(c), status: "APPLIED" as const };
       return { ...fields, apply: (tx: Parameters<typeof applyEmailChange>[0]) => createApplicationFromEmail(tx, userId, input, change), created: true };
     }
   }
@@ -319,13 +319,13 @@ export async function applyReview(userId: string, id: string, applicationId: str
 export async function createFromReview(userId: string, id: string): Promise<void> {
   const email = await ownedEmail(userId, id, ["NEEDS_REVIEW"]);
   const kind = reviewedKind(email);
-  if (!email.company || !email.jobTitle) throw new ReviewError("This email needs a company and job title to create an application.");
+  if (!email.company) throw new ReviewError("This email needs a company to create an application.");
   await enforceWriteLimit(userId);
   await db.$transaction(async (tx) => {
     const record = await createApplicationFromEmail(
       tx,
       userId,
-      { company: email.company!, title: email.jobTitle!, companyDomain: email.companyDomain, status: targetStatus(kind, null) },
+      { company: email.company!, title: email.jobTitle || ROLE_NOT_LISTED, companyDomain: email.companyDomain, status: targetStatus(kind, null) },
       reviewedChange(email, null),
     );
     await transition(tx, userId, id, "NEEDS_REVIEW", changeFields(record, true));

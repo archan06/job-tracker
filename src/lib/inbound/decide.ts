@@ -15,6 +15,9 @@ export type Classification = {
   summary: string;
 };
 
+/** The title given to an application created from an email that names the company but not the job (Handshake does this). */
+export const ROLE_NOT_LISTED = "Role not listed";
+
 export type Candidate = { id: string; company: string; companyDomain: string | null; title: string; status: ApplicationStatus };
 
 export type Decision =
@@ -71,7 +74,7 @@ export function decideEmail(c: Classification, candidates: Candidate[], sender: 
 
   if (found === "none") {
     if (c.kind !== "APPLICATION_CONFIRMATION") return review("No matching application");
-    return c.company && c.jobTitle ? { kind: "CREATE" } : review("Couldn't tell the company or job title");
+    return c.company ? { kind: "CREATE" } : review("Couldn't tell the company");
   }
 
   const s = found.status;
